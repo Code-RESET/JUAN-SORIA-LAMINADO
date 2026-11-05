@@ -226,7 +226,8 @@ try {
     assert.match(texto, /FIN-DE-NOTAS/);
     assert.match(texto, /NOTAS \(continúa\)/);
     // Ningún renglón de nota encimado con el pie de página.
-    assert.doesNotMatch(texto, /obra\.[ \t]+Juan Soria/); // mismo renglón = encimado
+    // Cada renglón de nota termina en "obra."; si algo sigue en el mismo renglón, se encimó (p. ej. el pie).
+    assert.doesNotMatch(texto, /obra\.[ \t]+\S/, "texto encimado con el pie de página");
   });
 
   await paso("Enviar PDF: comparte el ARCHIVO (no texto) con el menú del teléfono", async () => {
@@ -535,6 +536,16 @@ try {
     await j.goto(B + "#/bienvenida");
     await j.waitForSelector("#lista-cot");
     assert.equal(await j.evaluate(() => location.hash), "#/cotizaciones");
+  });
+
+  await paso("cotizador: 'Quitar logo' lo quita y el logo por defecto no regresa", async () => {
+    await j.goto(B + "#/ajustes");
+    await j.click("#aj-logo-quitar");
+    await j.waitForFunction(() => document.querySelector(".app-header img[data-marca-logo]").hidden);
+    await j.reload();
+    await j.waitForSelector("#app-shell:not([hidden])");
+    assert.ok(await j.isHidden(".app-header img[data-marca-logo]"), "sin logo tras recargar");
+    assert.equal(await j.locator("#aj-logo-prev img").count(), 0);
   });
   await cj.close();
 
