@@ -253,6 +253,16 @@ try {
     await p.waitForSelector("#f-orden");
     assert.equal(await p.evaluate(() => window.__xss), undefined);
     await p.click("#modal [data-close]");
+
+    // Respaldo dañado: cliente sin nombre y servicios inválidos -> no truena ni deja sin catálogo.
+    const antes = await p.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_servicios")).length);
+    const danado = { app: "juan-soria-laminado", clientes: [{ id: "c-sin-nombre" }], servicios: [{ id: "s-malo" }] };
+    await p.goto(B + "#/ajustes");
+    await p.setInputFiles("#file-restaurar", { name: "d.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(danado)) });
+    await p.click("#confirm [data-ok]");
+    await p.waitForTimeout(300);
+    const despues = await p.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_servicios")).length);
+    assert.equal(despues, antes, "el catálogo no debe perderse con un respaldo dañado");
     await c2.close();
   });
 

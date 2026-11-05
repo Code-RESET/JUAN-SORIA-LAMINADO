@@ -26,7 +26,9 @@ let unsubs = [];
 // Colecciones cuya lectura falló. Mientras haya alguna, no se
 // generan folios ni se siembra el catálogo (se quitan al reconectar).
 const fallidas = new Set();
-let cacheVaciaSinRed = false;
+// Colecciones clave que llegaron vacías SOLO desde la cache (sin
+// confirmar con el servidor). Se quitan al confirmar.
+const sinConfirmar = new Set();
 
 export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -63,7 +65,7 @@ export async function initStore(user) {
   COLLECTIONS.forEach((c) => (cache[c] = []));
   uid = user.uid;
   fallidas.clear();
-  cacheVaciaSinRed = false;
+  sinConfirmar.clear();
 
   if (DEMO_MODE) {
     COLLECTIONS.forEach((c) => (cache[c] = lsRead(c)));
@@ -82,15 +84,22 @@ export async function initStore(user) {
     // onSnapshot se apaga tras un error: lo volvemos a suscribir con
     // espera creciente (2s, 4s... máx 60s) para que no quede congelado.
     const suscribir = () => {
-      const unsub = onSnapshot(collection(fb.db, "usuarios", uid, col), (snap) => {
+      // includeMetadataChanges: sin esto, si el servidor confirma una
+      // colección VACÍA no llega ningún evento y nunca sabríamos que ya
+      // está confirmada (bloqueaba los folios para siempre).
+      const unsub = onSnapshot(collection(fb.db, "usuarios", uid, col), { includeMetadataChanges: true }, (snap) => {
         espera = 2000;
         fallidas.delete(col);
+        const clave = col === "servicios" || col === "ajustes";
         // Dispositivo nuevo sin señal: la cache local llega vacía. No es
         // "no hay datos", es "aún no sabemos": no sembrar ni numerar.
-        if (first && snap.metadata.fromCache && snap.empty && (col === "servicios" || col === "ajustes")) cacheVaciaSinRed = true;
-        if (!snap.metadata.fromCache) cacheVaciaSinRed = false;
+        if (clave && snap.metadata.fromCache && snap.empty) sinConfirmar.add(col);
+        if (!snap.metadata.fromCache) sinConfirmar.delete(col);
+        const soloMetadatos = !first && snap.docChanges().length === 0;
         cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-        if (first) { first = false; resolve(); } else { emit(col); if (col === "servicios") seedIfEmpty(); }
+        if (first) { first = false; resolve(); return; }
+        if (!soloMetadatos) emit(col);
+        if (clave) seedIfEmpty();
       }, (err) => {
         // Antes este error solo iba a la consola y la app se veía "vacía".
         fallidas.add(col);
@@ -184,7 +193,8 @@ export function siguienteFolio(col) {
 }
 
 export async function reservarFolio(col) {
-  if (fallidas.size || cacheVaciaSinRed) throw new Error("No se pudieron leer los datos; no se generan folios para no repetirlos. Revisa la conexión.");
+  if (fallidas.size) throw new Error("No se pudieron leer los datos; no se generan folios para no repetirlos. Revisa la conexión.");
+  if (sinConfirmar.has("ajustes")) throw new Error("Primera vez en este dispositivo y sin internet: conéctate un momento para sincronizar los folios.");
   const folio = siguienteFolio(col);
   const a = ajustes();
   await save("ajustes", { ...a, folios: { ...(a.folios || {}), [col]: folio } });
@@ -220,7 +230,7 @@ function limpiarImportado(col, item) {
   else if ("servicios" in x) x.servicios = [];
   for (const k of ["ivaPct", "vigenciaDias", "monto", "precio", "costo", "descuento"]) if (k in x) x[k] = Number(x[k]) || 0;
   for (const k of ["nombre", "clienteNombre", "telefono", "concepto", "categoria", "negocio"]) if (k in x) x[k] = String(x[k] ?? "");
-  if ((col === "clientes" || col === "servicios") && !x.nombre.trim()) return null;
+  if ((col === "clientes" || col === "servicios") && !String(x.nombre ?? "").trim()) return null;
   if (col === "ajustes" && x.id !== "config") return null;
   return x;
 }
@@ -230,6 +240,9 @@ export async function importarTodo(data) {
 
   // Ajustes: si aquí nunca se editaron (dispositivo nuevo), se toman los
   // del respaldo aunque sean "más viejos". Los folios toman el MAYOR.
+  for (const col of COLLECTIONS) {
+    if (col in data && !Array.isArray(data[col])) throw new Error(`El respaldo está dañado: "${col}" no es una lista.`);
+  }
   const ajR = limpiarImportado("ajustes", (data.ajustes || []).find((x) => x?.id === "config"));
   if (ajR) {
     const act = ajustes();
@@ -243,7 +256,8 @@ export async function importarTodo(data) {
   }
 
   // Catálogo: si el actual es solo el de fábrica y el respaldo trae uno, se reemplaza.
-  const servR = Array.isArray(data.servicios) ? data.servicios : [];
+  // Solo si el respaldo trae al menos un servicio VÁLIDO (si no, la app quedaría sin catálogo).
+  const servR = (data.servicios || []).map((s) => limpiarImportado("servicios", s)).filter(Boolean);
   if (servR.length && all("servicios").every((s) => s.semilla)) {
     for (const s of [...all("servicios")]) await remove("servicios", s.id);
   }
@@ -267,7 +281,7 @@ export async function importarTodo(data) {
 function seedIfEmpty() {
   // Si la carga falló (ej. permisos) NO sembramos: escribiría encima de datos que no pudimos leer.
   // La marca vive en ajustes/config (compartida entre dispositivos), no en el teléfono.
-  if (fallidas.size || cacheVaciaSinRed || all("servicios").length || ajustes().catalogoSembrado) return;
+  if (fallidas.size || sinConfirmar.size || all("servicios").length || ajustes().catalogoSembrado) return;
   // Precios de ejemplo (por unidad); Juan los ajusta en Ajustes → Catálogo.
   const base = [
     ["Piso laminado 8 mm", "m2", 320, 210],
