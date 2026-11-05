@@ -119,24 +119,36 @@ function puedeCompartirArchivo(file) {
   try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { return false; }
 }
 
-async function enviarPDF() {
-  if (!actual) return;
-  const { archivo, blob, nombre, mensaje, telefono, titulo } = actual;
-  if (puedeCompartirArchivo(archivo)) {
-    try {
-      // Solo el archivo (+título): en iPhone, mandar texto junto con el
-      // archivo hace que algunas apps descarten el PDF.
-      await navigator.share({ files: [archivo], title: titulo });
-      return;
-    } catch (e) {
-      if (e?.name === "AbortError") return; // el usuario cerró el menú
-      reportarError("compartir PDF", e);
-    }
-  }
-  // Respaldo (PC o navegador sin compartir archivos): descargar + abrir WhatsApp.
+let compartiendo = false; // evita un 2º share() con el menú aún abierto (doble clic en PC)
+
+function respaldoWhatsApp({ blob, nombre, mensaje, telefono }, abrirWA) {
   descargar(nombre, blob, "application/pdf");
-  if (telefono) window.open(waLink(telefono, mensaje + " (Le adjunto el PDF)"), "_blank", "noopener");
-  toast("PDF descargado: adjúntalo en el chat de WhatsApp");
+  if (telefono && abrirWA) window.open(waLink(telefono, mensaje + " (Le adjunto el PDF)"), "_blank", "noopener");
+  toast(abrirWA ? "PDF descargado: adjúntalo en el chat de WhatsApp" : "PDF descargado: compártelo desde tus descargas");
+}
+
+async function enviarPDF() {
+  if (!actual || compartiendo) return;
+  const datos = actual;
+  if (!puedeCompartirArchivo(datos.archivo)) {
+    // PC o navegador sin compartir archivos: todo dentro del mismo toque.
+    respaldoWhatsApp(datos, true);
+    return;
+  }
+  compartiendo = true;
+  try {
+    // Solo el archivo (+título): en iPhone, mandar texto junto con el
+    // archivo hace que algunas apps descarten el PDF.
+    await navigator.share({ files: [datos.archivo], title: datos.titulo });
+  } catch (e) {
+    if (e?.name !== "AbortError") { // AbortError = el usuario cerró el menú
+      reportarError("compartir PDF", e);
+      // Después de un await, iOS ya no deja abrir ventanas: solo descargamos.
+      respaldoWhatsApp(datos, false);
+    }
+  } finally {
+    compartiendo = false;
+  }
 }
 
 export function initDocumento() {

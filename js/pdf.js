@@ -22,7 +22,11 @@ function cargarJsPDF() {
     cargando = new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = new URL("./vendor/jspdf.umd.min.js", import.meta.url).href;
-      s.onload = () => (window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error("jsPDF no se inicializó")));
+      s.onload = () => {
+        if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
+        cargando = null; s.remove(); // permitir reintentar (ej. sin conexión)
+        reject(new Error("jsPDF no se inicializó"));
+      };
       s.onerror = () => { cargando = null; reject(new Error("No se pudo cargar el generador de PDF")); };
       document.head.appendChild(s);
     });
@@ -39,8 +43,8 @@ function txt(v) {
 const fechaTxt = (iso) => (/^\d{4}-\d{2}-\d{2}/.test(String(iso || "")) ? fecha(iso) : "");
 
 export function nombreArchivo(tipo, doc) {
-  const base = `${tipo === "orden" ? "Orden" : "Cotizacion"}-${String(doc.folio || "").padStart(4, "0")}-${doc.clienteNombre || "cliente"}`;
-  return base.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/-+/g, "-").slice(0, 80) + ".pdf";
+  const base = `${tipo === "orden" ? "Orden" : "Cotizacion"}-${String(doc.folio || "").padStart(4, "0")}-${String(doc.clienteNombre || "").trim() || "cliente"}`;
+  return base.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/-+/g, "-").slice(0, 80).replace(/-+$/, "") + ".pdf";
 }
 
 export async function generarPDF(tipo, doc) {
@@ -161,11 +165,17 @@ export async function generarPDF(tipo, doc) {
   y += 4;
 
   // ---------- Pagos, notas y condiciones ----------
+  // Renglón por renglón: un texto largo continúa en la página siguiente
+  // en vez de salirse del borde (antes se perdía sin aviso).
   const seccion = (etq, texto) => {
     const p = (set(9.5), pdf.splitTextToSize(txt(texto), ancho));
-    salto(8 + p.length * 4.4);
+    salto(8 + Math.min(p.length, 3) * 4.4); // título + primeros renglones juntos
     set(7.5, "bold", GRIS); pdf.text(etq, M, y); y += 4.5;
-    set(9.5); pdf.text(p, M, y); y += p.length * 4.4 + 4;
+    p.forEach((renglon) => {
+      if (salto(4.4)) { set(7.5, "bold", GRIS); pdf.text(etq + " (continúa)", M, y); y += 4.5; }
+      set(9.5); pdf.text(renglon, M, y); y += 4.4;
+    });
+    y += 4;
   };
   if (esOrden && (doc.pagos || []).length) {
     seccion("PAGOS REGISTRADOS", doc.pagos.map((p) => `${fechaTxt(p.fecha)}   ${p.metodo || ""}   ${money(p.monto)}`).join("\n"));

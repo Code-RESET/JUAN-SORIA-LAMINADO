@@ -151,6 +151,30 @@ try {
     await copyFile(ruta, `${OUT}/cotizacion-ejemplo.pdf`);
   });
 
+  await paso("PDF con notas muy largas: el texto continúa en otra página, no se pierde", async () => {
+    const b64 = await page.evaluate(async () => {
+      const { generarPDF } = await import("/js/pdf.js");
+      const notas = Array.from({ length: 140 }, (_, i) => `Renglón de nota número ${i + 1} con medidas y detalles de la obra.`).join("\n") + "\nFIN-DE-NOTAS";
+      const blob = await generarPDF("cotizacion", { folio: 99, clienteNombre: "Cliente Ejemplo PDF ", servicios: [{ descripcion: "Piso SPC", cantidad: 10, unidad: "m2", precio: 480 }], notas });
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      let s = ""; buf.forEach((c) => (s += String.fromCharCode(c)));
+      return btoa(s);
+    });
+    const { writeFile } = await import("node:fs/promises");
+    const ruta = `${OUT}/notas-largas.pdf`;
+    await writeFile(ruta, Buffer.from(b64, "base64"));
+    const { execFileSync } = await import("node:child_process");
+    let texto;
+    try { texto = execFileSync("pdftotext", ["-layout", ruta, "-"]).toString(); }
+    catch { console.log("   (pdftotext no instalado: se omite la verificación de texto)"); return; }
+    const paginas = texto.split("\f").filter((p) => p.trim());
+    assert.ok(paginas.length >= 2, `debe ocupar 2+ páginas, ocupó ${paginas.length}`);
+    assert.match(texto, /FIN-DE-NOTAS/);
+    assert.match(texto, /NOTAS \(continúa\)/);
+    // Ningún renglón de nota encimado con el pie de página.
+    assert.doesNotMatch(texto, /obra\.[ \t]+Juan Soria/); // mismo renglón = encimado
+  });
+
   await paso("Enviar PDF: comparte el ARCHIVO (no texto) con el menú del teléfono", async () => {
     await page.evaluate(() => {
       window.__compartido = null;

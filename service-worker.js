@@ -6,7 +6,7 @@
 // Subir CACHE_VERSION cada vez que cambien archivos base.
 // ============================================================
 
-const CACHE_VERSION = "juan-soria-v8";
+const CACHE_VERSION = "juan-soria-v9";
 const CORE_ASSETS = [
   "./",
   "./index.html",
