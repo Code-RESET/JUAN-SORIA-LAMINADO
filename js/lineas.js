@@ -56,13 +56,15 @@ export function calcularCajas(m2, m2PorCaja) {
   const porCaja = num(m2PorCaja);
   if (!(porCaja > 0) || !(num(m2) > 0)) return null;
   const cajas = Math.ceil(limpio(num(m2) / porCaja));
-  return { cajas, m2: Math.round(cajas * porCaja * 100) / 100 };
+  return { cajas, m2: Math.ceil(Math.round(cajas * porCaja * 1e9) / 1e7) / 100 };
 }
+
+let siguienteK = 1; // id estable de cada fila (el selector "Aplicar a" no usa posiciones)
 
 function rowHTML(l = {}) {
   const u = l.unidad || "m2";
   return `
-  <div class="linea"${l.cajas ? ` data-cajas="${esc(l.cajas)}"` : ""}>
+  <div class="linea" data-k="${siguienteK++}"${l.cajas ? ` data-cajas="${esc(l.cajas)}"` : ""}>
     <input class="input l-desc" list="catalogo-servicios" placeholder="Producto o servicio (ej. Piso SPC)" value="${esc(l.descripcion || "")}" />
     <div class="linea-nums">
       <label><span>Cantidad</span><input class="input l-cant" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(l.cantidad || 1)}" /></label>
@@ -150,7 +152,7 @@ export function bindLineas(root, onUpdate) {
   const alCambiar = (e) => {
     const row = e.target.closest(".linea");
     // Si se cambia a mano la cantidad o el producto, ya no son "cajas completas".
-    if (row && (e.target.classList.contains("l-cant") || e.target.classList.contains("l-desc")) && e.isTrusted !== false) marcarCajas(row, null);
+    if (row && ["l-cant", "l-desc", "l-unidad"].some((c) => e.target.classList.contains(c))) marcarCajas(row, null);
     // Al elegir un producto del catálogo se llenan unidad, precio y costo.
     if (e.target.classList.contains("l-desc")) {
       const s = producto(row);
@@ -172,6 +174,7 @@ export function bindLineas(root, onUpdate) {
   const areas = $(".calc-areas", calc);
   const dest = $(".c-dest", calc);
   let r = { area: 0, total: 0 };
+  let elegidoAMano = false; // si el usuario eligió destino, se respeta
 
   function llenarDestinos() {
     const filas = $$(".linea", cont);
@@ -179,15 +182,21 @@ export function bindLineas(root, onUpdate) {
     dest.innerHTML = filas.map((row, i) => {
       const s = producto(row);
       const nombre = $(".l-desc", row).value.trim() || `Concepto ${i + 1} (sin nombre)`;
-      return `<option value="${i}">${esc(nombre)}${s?.m2Caja ? ` · caja ${esc(s.m2Caja)} m²` : ""}</option>`;
+      return `<option value="${esc(row.dataset.k)}">${esc(nombre)}${s?.m2Caja ? ` · caja ${esc(s.m2Caja)} m²` : ""}</option>`;
     }).join("");
-    // Por omisión: el primer concepto que se vende por caja; si no, el último.
-    const conCaja = filas.findIndex((row) => producto(row)?.m2Caja);
-    dest.value = prev !== "" && Number(prev) < filas.length ? prev : String(conCaja >= 0 ? conCaja : filas.length - 1);
+    const existe = filas.some((row) => row.dataset.k === prev);
+    if (elegidoAMano && existe) {
+      dest.value = prev;
+    } else {
+      elegidoAMano = false;
+      // Por omisión: el primer concepto que se vende por caja; si no, el último.
+      const def = filas.find((row) => producto(row)?.m2Caja) || filas[filas.length - 1];
+      dest.value = def ? def.dataset.k : "";
+    }
     actualizarCalc();
   }
 
-  function filaDestino() { return $$(".linea", cont)[Number(dest.value)] || $$(".linea", cont).pop(); }
+  function filaDestino() { return $$(".linea", cont).find((row) => row.dataset.k === dest.value) || null; }
 
   function actualizarCalc() {
     const pares = $$(".calc-area", areas).map((el) => {
@@ -222,7 +231,7 @@ export function bindLineas(root, onUpdate) {
     actualizarCalc();
   });
   calc.addEventListener("input", actualizarCalc);
-  dest.addEventListener("change", actualizarCalc);
+  dest.addEventListener("change", () => { elegidoAMano = true; actualizarCalc(); });
 
   const aplicar = (cantidad, cajas) => {
     const row = filaDestino();
@@ -249,7 +258,8 @@ export function leerLineas(root) {
       precio: num($(".l-precio", r).value),
       costo: num($(".l-costo", r).value)
     };
-    if (r.dataset.cajas) l.cajas = Number(r.dataset.cajas) || undefined;
+    const cajas = Number.parseInt(r.dataset.cajas, 10);
+    if (cajas > 0) l.cajas = cajas;
     return l;
   }).filter((l) => l.descripcion || l.precio);
 }

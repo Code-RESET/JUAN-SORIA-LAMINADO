@@ -114,7 +114,7 @@ try {
     await page.locator(".c-a").nth(1).fill("2");
     await page.locator(".c-b").nth(1).fill("1.5");          // 20 + 3 = 23 m² reales
     assert.match(await page.textContent(".c-area"), /23\.00 m²/);
-    await page.selectOption(".c-dest", "1");
+    await page.selectOption(".c-dest", { label: "Instalación de piso" });
     await page.click("#calc-usar-real");
     assert.equal(await page.locator(".l-cant").nth(1).inputValue(), "23");
     await page.locator(".l-desc").nth(1).evaluate((el) => el.blur());
@@ -146,6 +146,24 @@ try {
     assert.match(await page.textContent(".doc"), /10 cajas/);
     await page.screenshot({ path: `${OUT}/5-documento.png` });
     await page.click("[data-doc-close]");
+    await page.click("#modal [data-close]");
+  });
+
+  await paso("'Aplicar a' sigue al concepto elegido aunque se borre otro", async () => {
+    await page.goto(B + "#/ordenes");
+    await page.click(".tab-plus");
+    await page.waitForSelector("#f-orden");
+    await page.fill(".l-desc", "Bajo piso / espuma");
+    await page.click("#add-linea"); await page.locator(".l-desc").nth(1).fill("Zoclo PVC");
+    await page.click("#add-linea"); await page.locator(".l-desc").nth(2).fill("Instalación de piso");
+    await page.click("#toggle-calc");
+    await page.fill(".c-a", "3"); await page.fill(".c-b", "2");
+    await page.selectOption(".c-dest", { label: "Zoclo PVC" });
+    await page.locator(".l-del").nth(0).click();          // borra "Bajo piso"
+    assert.equal(await page.$eval(".c-dest", (s) => s.selectedOptions[0].textContent), "Zoclo PVC");
+    await page.click("#calc-usar-real");
+    assert.equal(await page.locator(".l-cant").nth(0).inputValue(), "6");   // Zoclo (ahora 1ª fila)
+    assert.equal(await page.locator(".l-cant").nth(1).inputValue(), "1");   // Instalación intacta
     await page.click("#modal [data-close]");
   });
 

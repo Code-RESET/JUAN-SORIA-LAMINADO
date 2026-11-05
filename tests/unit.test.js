@@ -188,3 +188,8 @@ test("cajas: redondea a cajas completas y da los m² reales a cobrar", async () 
   assert.equal(calcularCajas(10, ""), null);   // producto sin m² por caja
   assert.equal(calcularCajas(0, 2.13), null);
 });
+
+test("cajas: con m² por caja de 3 decimales no cobra de menos", async () => {
+  const { calcularCajas } = await import("../js/lineas.js");
+  assert.deepEqual(calcularCajas(5.5, 1.995), { cajas: 3, m2: 5.99 }); // 5.985 real -> 5.99
+});

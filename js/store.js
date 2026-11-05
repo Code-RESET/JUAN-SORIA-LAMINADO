@@ -151,7 +151,12 @@ export async function save(col, obj, { conservarFecha = false } = {}) {
     // Sin await del servidor: con la cache offline la escritura queda
     // en cola y se sube sola al volver la señal.
     // ajustes se fusiona (merge) para que dos dispositivos no se pisen campos distintos.
-    setDoc(doc(fb.db, "usuarios", uid, col, id), data, col === "ajustes" ? { merge: true } : {}).catch((e) => reportarError(`guardar ${col}`, e));
+    try {
+      setDoc(doc(fb.db, "usuarios", uid, col, id), data, col === "ajustes" ? { merge: true } : {}).catch((e) => reportarError(`guardar ${col}`, e));
+    } catch (e) {
+      // setDoc puede fallar ANTES de devolver la promesa (dato inválido): también se reporta.
+      reportarError(`guardar ${col}`, e);
+    }
   }
   emit(col);
   return item;
@@ -229,7 +234,12 @@ function limpiarImportado(col, item) {
   }
   if (Array.isArray(x.pagos)) x.pagos = x.pagos.map((p) => ({ ...p, monto: Number(p?.monto) || 0, metodo: String(p?.metodo ?? ""), fecha: FECHA_RE.test(String(p?.fecha)) ? p.fecha : "" }));
   else if ("pagos" in x) x.pagos = [];
-  if (Array.isArray(x.servicios)) x.servicios = x.servicios.map((l) => ({ ...l, descripcion: String(l?.descripcion ?? ""), cantidad: Number(l?.cantidad) || 1, precio: Number(l?.precio) || 0, costo: Number(l?.costo) || 0, ...(l?.cajas ? { cajas: Number.parseInt(l.cajas, 10) || undefined } : {}) }));
+  if (Array.isArray(x.servicios)) x.servicios = x.servicios.map((l) => ({ ...l, descripcion: String(l?.descripcion ?? ""), cantidad: Number(l?.cantidad) || 1, precio: Number(l?.precio) || 0, costo: Number(l?.costo) || 0 })).map((l) => {
+    // cajas: solo enteros > 0; si no, se quita (Firestore rechaza `undefined`).
+    const n = Number.parseInt(l.cajas, 10);
+    if (n > 0) l.cajas = n; else delete l.cajas;
+    return l;
+  });
   else if ("servicios" in x) x.servicios = [];
   if ("m2Caja" in x) x.m2Caja = Number(x.m2Caja) > 0 ? Number(x.m2Caja) : "";
   for (const k of ["ivaPct", "vigenciaDias", "monto", "precio", "costo", "descuento"]) if (k in x) x[k] = Number(x[k]) || 0;

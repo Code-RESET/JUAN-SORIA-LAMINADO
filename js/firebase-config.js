@@ -77,6 +77,7 @@ export async function getFirebase() {
   ]);
   const app = initializeApp(FIREBASE_CONFIG);
   const db = fsMod.initializeFirestore(app, {
+    ignoreUndefinedProperties: true, // un campo undefined no debe tumbar un guardado
     localCache: fsMod.persistentLocalCache({ tabManager: fsMod.persistentMultipleTabManager() })
   });
   _fb = { app, auth: authMod.getAuth(app), db, authMod, fsMod };
