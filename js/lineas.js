@@ -37,9 +37,9 @@ export function calcularM2(medida1, medida2, mermaPct = 0) {
   const a = Math.max(num(medida1), 0);
   const b = Math.max(num(medida2), 0);
   const merma = Math.min(Math.max(num(mermaPct), 0), 100);
-  const area = Math.round(a * b * 1e6) / 1e6;
+  const area = Math.round(a * b * 1e9) / 1e9;
   const conMerma = area * (1 + merma / 100);
-  const total = Math.ceil(Math.round(conMerma * 1e6) / 1e4) / 100;
+  const total = Math.ceil(Math.round(conMerma * 1e9) / 1e7) / 100;
   return { area, total };
 }
 

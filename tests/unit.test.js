@@ -162,3 +162,8 @@ test("calculadora de m²: entradas inválidas no dan resultados raros", async ()
   assert.equal(calcularM2(4, 3, 500).total, 24);    // merma máxima 100 %
   assert.equal(calcularM2("4.5", "2", "").total, 9);
 });
+
+test("calculadora de m²: medidas de 3 decimales con merma decimal", async () => {
+  const { calcularM2 } = await import("../js/lineas.js");
+  assert.equal(calcularM2(3.247, 4.724, 9.2).total, 16.76); // 16.750000176 -> sube a 16.76
+});
