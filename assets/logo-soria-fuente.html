@@ -1,0 +1,88 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  body { margin: 0; background: #222; }
+  svg { display: block; }
+  .t-top, .t-bot { font-family: "Inter Display", "Inter", sans-serif; fill: #fff; }
+  .t-top { font-weight: 300; }
+  .t-bot { font-weight: 400; }
+  .soria { font-family: "Inter Display", "Inter", sans-serif; font-weight: 900; }
+</style></head>
+<body>
+<svg id="defs" width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- Veta de madera: ruido estirado en horizontal -->
+    <filter id="veta" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.004 0.18" numOctaves="3" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix"
+        values="0 0 0 0 0.20
+                0 0 0 0 0.07
+                0 0 0 0 0.02
+                0 0 0 0.55 0" result="vet"/>
+      <feComposite in="vet" in2="SourceGraphic" operator="in"/>
+    </filter>
+    <linearGradient id="madera" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a2f17"/>
+      <stop offset=".45" stop-color="#a8482a"/>
+      <stop offset="1" stop-color="#6b2812"/>
+    </linearGradient>
+    <radialGradient id="vineta" cx=".5" cy=".5" r=".75">
+      <stop offset=".55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".55"/>
+    </radialGradient>
+    <filter id="sombra" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- Fondo de duelas: tablas horizontales con juntas -->
+<template id="fondo">
+  <rect width="100%" height="100%" fill="url(#madera)"/>
+  <rect width="100%" height="100%" fill="#000" filter="url(#veta)"/>
+</template>
+
+<!-- Logo horizontal 1000 × 415 -->
+<svg id="ancho" width="1000" height="415" viewBox="0 0 1000 415" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1000" height="415" fill="url(#madera)"/>
+  <rect width="1000" height="415" fill="#000" filter="url(#veta)"/>
+  <g stroke="#3a1206" stroke-opacity=".45" stroke-width="2">
+    <line x1="0" y1="104" x2="1000" y2="104"/><line x1="0" y1="208" x2="1000" y2="208"/><line x1="0" y1="312" x2="1000" y2="312"/>
+    <line x1="310" y1="0" x2="310" y2="104"/><line x1="720" y1="104" x2="720" y2="208"/>
+    <line x1="160" y1="208" x2="160" y2="312"/><line x1="560" y1="312" x2="560" y2="415"/>
+  </g>
+  <rect width="1000" height="415" fill="url(#vineta)"/>
+  <g filter="url(#sombra)" text-anchor="middle">
+        <!-- SORIA con líneas paralelas: banda blanca, hueco, línea interior -->
+    <g class="soria" font-size="250" letter-spacing="10" stroke-linejoin="round">
+      <text x="500" y="265" fill="#fff" stroke="#fff" stroke-width="24">SORIA</text>
+      <text x="500" y="265" fill="#fff" stroke="#5a1d0b" stroke-width="13.5">SORIA</text>
+      <text x="500" y="265" fill="#fff" stroke="#fff" stroke-width="8">SORIA</text>
+      <text x="500" y="265" fill="#fff" stroke="#5a1d0b" stroke-width="3">SORIA</text>
+      <text x="500" y="265" fill="#fff">SORIA</text>
+    </g>
+    <text class="t-bot" x="500" y="368" font-size="56" letter-spacing="2">PISO LAMINADO Y DUELA</text>
+  </g>
+</svg>
+
+<!-- Ícono cuadrado 512 × 512 (texto dentro de la zona segura del 80 %) -->
+<svg id="icono" width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="url(#madera)"/>
+  <rect width="512" height="512" fill="#000" filter="url(#veta)"/>
+  <g stroke="#3a1206" stroke-opacity=".45" stroke-width="2">
+    <line x1="0" y1="128" x2="512" y2="128"/><line x1="0" y1="256" x2="512" y2="256"/><line x1="0" y1="384" x2="512" y2="384"/>
+    <line x1="190" y1="0" x2="190" y2="128"/><line x1="380" y1="128" x2="380" y2="256"/><line x1="110" y1="256" x2="110" y2="384"/><line x1="300" y1="384" x2="300" y2="512"/>
+  </g>
+  <rect width="512" height="512" fill="url(#vineta)"/>
+  <g filter="url(#sombra)" text-anchor="middle">
+        <g class="soria" font-size="108" letter-spacing="4" stroke-linejoin="round">
+      <text x="256" y="276" fill="#fff" stroke="#fff" stroke-width="11">SORIA</text>
+      <text x="256" y="276" fill="#fff" stroke="#5a1d0b" stroke-width="6.4">SORIA</text>
+      <text x="256" y="276" fill="#fff" stroke="#fff" stroke-width="3.8">SORIA</text>
+      <text x="256" y="276" fill="#fff" stroke="#5a1d0b" stroke-width="1.4">SORIA</text>
+      <text x="256" y="276" fill="#fff">SORIA</text>
+    </g>
+    <text class="t-bot" x="256" y="322" font-size="22" letter-spacing="1">PISO LAMINADO Y DUELA</text>
+  </g>
+</svg>
+</body></html>
