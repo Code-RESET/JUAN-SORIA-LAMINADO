@@ -28,7 +28,7 @@ export function abrirDocumento(tipo, doc) {
   const t = totales(doc);
   const esOrden = tipo === "orden";
   const titulo = esOrden ? "ORDEN DE TRABAJO" : "COTIZACIÓN";
-  const folio = String(doc.folio || "").padStart(4, "0");
+  const folio = esc(String(doc.folio || "").padStart(4, "0"));
 
   const filas = (doc.servicios || []).map((l) => `
     <tr><td>${esc(l.descripcion)}</td><td class="c">${esc(l.cantidad || 1)} ${UNIDADES[l.unidad] || ""}</td>
@@ -73,7 +73,7 @@ export function abrirDocumento(tipo, doc) {
 
   const ov = document.getElementById("doc-overlay");
   ov.querySelector(".doc-frame").innerHTML = html;
-  ov.querySelector(".doc-topbar-title").textContent = `${esOrden ? "Orden" : "Cotización"} #${folio}`;
+  ov.querySelector(".doc-topbar-title").textContent = `${esOrden ? "Trabajo" : "Cotización"} #${doc.folio || ""}`;
 
   const resumen = `${a.negocio}\n${esOrden ? "Orden de trabajo" : "Cotización"} #${folio}\n` +
     (obraTxt(doc.obra) ? `Obra: ${obraTxt(doc.obra)}\n` : "") +

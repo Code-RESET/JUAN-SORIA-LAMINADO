@@ -69,7 +69,7 @@ export function renderDashboard(container) {
     ${agenda.length ? `<div class="list" data-cards>${agenda.map((o) => {
       const late = o.fechaInstalacion < hoy;
       return `
-      <div class="card row-card" data-id="${o.id}">
+      <div class="card row-card" data-id="${esc(o.id)}">
         <div class="date-badge ${late ? "late" : o.fechaInstalacion === hoy ? "today" : ""}">${etiquetaDia(o.fechaInstalacion)}</div>
         <div class="grow"><div class="card-title">${esc(o.clienteNombre)}</div>
           <div class="small">${esc((o.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>

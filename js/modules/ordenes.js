@@ -15,6 +15,7 @@ import { esc, money, num, fecha, hoyISO, toast, openModal, closeModal, confirmar
 import { lineasEditorHTML, bindLineas, leerLineas, totales, resumenHTML, lineaTxt } from "../lineas.js";
 import { abrirDocumento, ESTADOS, obraTxt } from "../documento.js";
 import { asegurarCliente } from "./clientes.js";
+import { reportarError } from "../errores.js";
 
 const FILTROS = [
   ["ACTIVAS", "Activos"], ["MEDICION", "Medición"], ["MATERIAL", "Material"],
@@ -25,7 +26,7 @@ const METODOS = ["Efectivo", "Transferencia", "Tarjeta"];
 let filtro = "ACTIVAS";
 let busqueda = "";
 
-const fol = (n) => String(n || "").padStart(4, "0");
+const fol = (n) => esc(String(n || "").padStart(4, "0"));
 
 export function renderOrdenes(container, user, param) {
   if (param && param.startsWith("f:")) { // #/ordenes/f:MATERIAL -> abre con ese filtro
@@ -90,10 +91,10 @@ export function ordenCardHTML(o) {
     : t.pagado > 0 ? `<span class="pill warn">Saldo ${money(t.saldo)}</span>`
     : `<span class="pill bad">Sin anticipo</span>`;
   return `
-  <div class="card orden-card" data-id="${o.id}">
+  <div class="card orden-card" data-id="${esc(o.id)}">
     <div class="orden-top">
       <span class="folio">#${fol(o.folio)}</span>
-      <span class="estado e-${o.estado}">${ESTADOS[o.estado] || ""}</span>
+      <span class="estado e-${esc(o.estado)}">${ESTADOS[o.estado] || ""}</span>
     </div>
     <div class="card-title">${esc(o.clienteNombre || "")}</div>
     <div class="small">${esc(titulo(o))}</div>
@@ -172,8 +173,12 @@ export function detalleOrden(id) {
     </div>
   `, { wide: true });
 
+  // Siempre releer antes de guardar: otro dispositivo pudo cambiar
+  // el trabajo mientras este modal estaba abierto (no pisar abonos).
+  const fresco = () => store.get("ordenes", id) || o;
+
   body.querySelectorAll("[data-estado]").forEach((b) => (b.onclick = async () => {
-    const upd = { ...o, estado: b.dataset.estado };
+    const upd = { ...fresco(), estado: b.dataset.estado };
     if (b.dataset.estado === "TERMINADO" && !o.fechaTerminado) upd.fechaTerminado = hoyISO();
     await store.save("ordenes", upd);
     toast(`Estado: ${ESTADOS[b.dataset.estado]}`);
@@ -186,15 +191,19 @@ export function detalleOrden(id) {
     const f = Object.fromEntries(new FormData(fp).entries());
     const monto = num(f.monto);
     if (monto <= 0) return;
-    await store.save("ordenes", { ...o, pagos: [...(o.pagos || []), { monto, metodo: f.metodo, fecha: f.fecha || hoyISO() }] });
+    const act = fresco();
+    await store.save("ordenes", { ...act, pagos: [...(act.pagos || []), { monto, metodo: f.metodo, fecha: f.fecha || hoyISO() }] });
     toast("Pago registrado");
     detalleOrden(id);
   };
 
   body.querySelectorAll("[data-del-pago]").forEach((b) => (b.onclick = async () => {
     if (!(await confirmar("¿Quitar este pago?", "Quitar"))) return;
-    const pagos = (o.pagos || []).filter((_, i) => i !== Number(b.dataset.delPago));
-    await store.save("ordenes", { ...o, pagos });
+    const p0 = (o.pagos || [])[Number(b.dataset.delPago)];
+    const act = fresco();
+    const idx = (act.pagos || []).findIndex((q) => q.monto === p0?.monto && q.fecha === p0?.fecha && q.metodo === p0?.metodo);
+    if (idx < 0) { detalleOrden(id); return; }
+    await store.save("ordenes", { ...act, pagos: act.pagos.filter((_, i) => i !== idx) });
     detalleOrden(id);
   }));
 
@@ -300,10 +309,21 @@ export function formOrden(base = {}) {
     enviando = true;
     $("#btn-guardar-orden", form).disabled = true;
 
+    let folio;
+    try {
+      folio = editando ? o.folio : await store.reservarFolio("ordenes");
+    } catch (err) {
+      reportarError("folio de trabajo", err);
+      toast(err.message);
+      enviando = false;
+      $("#btn-guardar-orden", form).disabled = false;
+      return;
+    }
     const cliente = await asegurarCliente(f.clienteNombre, f.telefono);
+    const actual = editando ? (store.get("ordenes", o.id) || o) : {};
     const orden = {
-      ...(editando ? o : {}),
-      folio: editando ? o.folio : store.siguienteFolio("ordenes"),
+      ...actual,
+      folio,
       clienteId: cliente?.id || "",
       clienteNombre: f.clienteNombre.trim(),
       telefono: f.telefono.trim(),
@@ -317,7 +337,7 @@ export function formOrden(base = {}) {
       estado: f.estado,
       notas: f.notas.trim(),
       garantia: f.garantia.trim(),
-      pagos: editando ? (o.pagos || []) : (num(f.anticipo) > 0 ? [{ monto: num(f.anticipo), metodo: "Efectivo", fecha: hoyISO(), nota: "Anticipo" }] : []),
+      pagos: editando ? (actual.pagos || []) : (num(f.anticipo) > 0 ? [{ monto: num(f.anticipo), metodo: "Efectivo", fecha: hoyISO(), nota: "Anticipo" }] : []),
       cotizacionId: o.cotizacionId || ""
     };
     const saved = await store.save("ordenes", orden);

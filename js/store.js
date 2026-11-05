@@ -71,18 +71,30 @@ export async function initStore(user) {
   const { collection, onSnapshot } = fb.fsMod;
   // Primera carga: esperamos a que cada colección responda una vez
   // (desde la cache offline si no hay red) antes de pintar la app.
+  const sesion = uid;
   await Promise.all(COLLECTIONS.map((col) => new Promise((resolve) => {
     let first = true;
-    const unsub = onSnapshot(collection(fb.db, "usuarios", uid, col), (snap) => {
-      cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-      if (first) { first = false; resolve(); } else emit(col);
-    }, (err) => {
-      // Antes este error solo iba a la consola y la app se veía "vacía".
-      cargaFallida = true;
-      reportarError(`leer ${col} (Firestore)`, err);
-      if (first) { first = false; resolve(); }
-    });
-    unsubs.push(unsub);
+    let espera = 2000;
+    // onSnapshot se apaga tras un error: lo volvemos a suscribir con
+    // espera creciente (2s, 4s... máx 60s) para que no quede congelado.
+    const suscribir = () => {
+      const unsub = onSnapshot(collection(fb.db, "usuarios", uid, col), (snap) => {
+        espera = 2000;
+        cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        if (first) { first = false; resolve(); } else emit(col);
+      }, (err) => {
+        // Antes este error solo iba a la consola y la app se veía "vacía".
+        if (first) cargaFallida = true;
+        reportarError(`leer ${col} (Firestore)`, err);
+        if (first) { first = false; resolve(); }
+        if (err?.code !== "permission-denied") {
+          setTimeout(() => { if (uid === sesion && unsubs.length) suscribir(); }, espera);
+          espera = Math.min(espera * 2, 60000);
+        }
+      });
+      unsubs.push(unsub);
+    };
+    suscribir();
   })));
   seedIfEmpty();
 }
@@ -100,11 +112,11 @@ export function get(col, id) {
   return all(col).find((x) => x.id === id) || null;
 }
 
-export async function save(col, obj) {
+export async function save(col, obj, { conservarFecha = false } = {}) {
   const item = { ...obj };
   const isNew = !item.id;
   if (isNew) { item.id = newId(); item.creado = Date.now(); }
-  item.actualizado = Date.now();
+  if (!conservarFecha || !item.actualizado) item.actualizado = Date.now();
 
   const list = cache[col] || (cache[col] = []);
   const idx = list.findIndex((x) => x.id === item.id);
@@ -151,9 +163,22 @@ export function ajustes() {
 }
 
 // ---------- Folios consecutivos ----------
+// El contador vive en ajustes/config y NUNCA baja: si se borra el
+// trabajo #7, el siguiente es #8 (el #7 ya pudo entregarse impreso).
+// Nota: con Firebase y dos dispositivos SIN señal al mismo tiempo
+// aún podría repetirse un folio; para eso haría falta una
+// transacción en línea (pendiente si usan varios dispositivos).
 export function siguienteFolio(col) {
   const max = all(col).reduce((m, x) => Math.max(m, Number(x.folio) || 0), 0);
-  return max + 1;
+  return Math.max(max, Number(ajustes().folios?.[col]) || 0) + 1;
+}
+
+export async function reservarFolio(col) {
+  if (cargaFallida) throw new Error("No se pudieron leer los datos; no se generan folios para no repetirlos. Revisa la conexión.");
+  const folio = siguienteFolio(col);
+  const a = ajustes();
+  await save("ajustes", { ...a, folios: { ...(a.folios || {}), [col]: folio } });
+  return folio;
 }
 
 // ---------- Respaldo / restauración ----------
@@ -163,19 +188,47 @@ export function exportarTodo() {
   return data;
 }
 
+// Valida lo que viene de un archivo (puede estar manipulado) y NO
+// pisa registros que hoy son más nuevos que los del respaldo.
+const ESTADOS_VALIDOS = {
+  ordenes: ["MEDICION", "MATERIAL", "INSTALACION", "TERMINADO"],
+  cotizaciones: ["ABIERTA", "ACEPTADA", "RECHAZADA"]
+};
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function limpiarImportado(col, item) {
+  if (!item || typeof item !== "object" || !/^[\w-]{1,40}$/.test(String(item.id || ""))) return null;
+  const x = { ...item };
+  if ("folio" in x) x.folio = Number.parseInt(x.folio, 10) || 0;
+  if (ESTADOS_VALIDOS[col] && !ESTADOS_VALIDOS[col].includes(x.estado)) x.estado = ESTADOS_VALIDOS[col][0];
+  for (const k of ["fecha", "fechaIngreso", "fechaInstalacion", "fechaTerminado"]) {
+    if (k in x && x[k] && !FECHA_RE.test(String(x[k]))) x[k] = "";
+  }
+  if (Array.isArray(x.pagos)) x.pagos = x.pagos.map((p) => ({ ...p, fecha: FECHA_RE.test(String(p?.fecha)) ? p.fecha : "" }));
+  return x;
+}
+
 export async function importarTodo(data) {
+  const res = { nuevos: 0, actualizados: 0, omitidos: 0 };
   for (const col of COLLECTIONS) {
     if (!Array.isArray(data[col])) continue;
-    for (const item of data[col]) {
-      if (item && item.id) await save(col, item);
+    for (const raw of data[col]) {
+      const item = limpiarImportado(col, raw);
+      if (!item) { res.omitidos++; continue; }
+      const actual = get(col, item.id);
+      if (actual && (Number(actual.actualizado) || 0) >= (Number(item.actualizado) || 0)) { res.omitidos++; continue; }
+      await save(col, item, { conservarFecha: true });
+      actual ? res.actualizados++ : res.nuevos++;
     }
   }
+  return res;
 }
 
 // ---------- Catálogo inicial (solo la primera vez) ----------
 function seedIfEmpty() {
   // Si la carga falló (ej. permisos) NO sembramos: escribiría encima de datos que no pudimos leer.
-  if (cargaFallida || all("servicios").length || localStorage.getItem(lsKey("seeded_pisos"))) return;
+  // La marca vive en ajustes/config (compartida entre dispositivos), no en el teléfono.
+  if (cargaFallida || all("servicios").length || ajustes().catalogoSembrado) return;
   // Precios de ejemplo (por unidad); Juan los ajusta en Ajustes → Catálogo.
   const base = [
     ["Piso laminado 8 mm", "m2", 320, 210],
@@ -194,6 +247,6 @@ function seedIfEmpty() {
     ["Papel tapiz (incluye instalación)", "m2", 380, 190],
     ["Retiro de piso existente", "m2", 60, 0]
   ];
+  save("ajustes", { ...ajustes(), catalogoSembrado: true });
   base.forEach(([nombre, unidad, precio, costo]) => save("servicios", { nombre, unidad, precio, costo }));
-  try { localStorage.setItem(lsKey("seeded_pisos"), "1"); } catch {}
 }

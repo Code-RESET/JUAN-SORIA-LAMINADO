@@ -30,7 +30,7 @@ export function hoyISO() {
 export function fecha(iso) {
   if (!iso) return "—";
   const [y, m, d] = String(iso).slice(0, 10).split("-");
-  if (!d) return iso;
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso).slice(0, 10))) return esc(iso);
   const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   return `${Number(d)} ${meses[Number(m) - 1]} ${y}`;
 }

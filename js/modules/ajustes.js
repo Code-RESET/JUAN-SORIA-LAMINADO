@@ -39,7 +39,7 @@ export function renderAjustes(container) {
       <div class="card-h-row"><h3 class="card-h">Catálogo de servicios</h3><button class="btn btn-ghost btn-sm" id="nuevo-serv">+ Agregar</button></div>
       <p class="muted small">Al escribir un producto en un trabajo o cotización, se llenan solos la unidad y el precio.</p>
       <div class="catalogo">
-        ${cat.map((s) => `<div class="row-card slim" data-id="${s.id}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong></div>`).join("") || `<p class="muted">Sin servicios.</p>`}
+        ${cat.map((s) => `<div class="row-card slim" data-id="${esc(s.id)}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong></div>`).join("") || `<p class="muted">Sin servicios.</p>`}
       </div>
     </div>
 
@@ -76,8 +76,9 @@ export function renderAjustes(container) {
 
   $("#f-negocio", container).onsubmit = async (e) => {
     e.preventDefault();
+    e.target.removeAttribute("data-dirty"); // ya se guarda: permitir repintar
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("ajustes", { ...a, ...f, id: "config", ivaPct: num(f.ivaPct), vigenciaDias: num(f.vigenciaDias) || 15 });
+    await store.save("ajustes", { ...store.ajustes(), ...f, id: "config", ivaPct: num(f.ivaPct), vigenciaDias: num(f.vigenciaDias) || 15 });
     toast("Datos guardados");
   };
 
@@ -96,9 +97,9 @@ export function renderAjustes(container) {
     try {
       const data = JSON.parse(await file.text());
       if (data.app !== "juan-soria-laminado") throw new Error("Archivo no reconocido");
-      if (!(await confirmar("Se agregarán/actualizarán los datos del respaldo. ¿Continuar?", "Restaurar"))) return;
-      await store.importarTodo(data);
-      toast("Respaldo restaurado");
+      if (!(await confirmar("Se agregarán los registros del respaldo. Lo que hoy esté más actualizado NO se reemplaza. ¿Continuar?", "Restaurar"))) return;
+      const r = await store.importarTodo(data);
+      toast(`Restaurado: ${r.nuevos} nuevos, ${r.actualizados} actualizados, ${r.omitidos} sin cambio`);
     } catch (err) {
       reportarError("restaurar respaldo", err);
       alert("No se pudo restaurar: " + err.message);
@@ -209,17 +210,16 @@ async function cargarEjemplos() {
     ["Cliente Ejemplo Cuatro", "8710000004", { direccion: "Privada Muestra 404", colonia: "Col. Demo", espacio: "Muro de TV", m2: "" },
       [L("Panel decorativo WPC / ranurado", 6, "pza", 650, 380)], "TERMINADO", -12, -8, [3900]]
   ];
-  let folio = store.siguienteFolio("ordenes");
   for (const [nombre, tel, obra, servicios, estado, alta, inst, pagos] of ej) {
     const c = await store.save("clientes", { nombre, telefono: tel });
     await store.save("ordenes", {
-      folio: folio++, clienteId: c.id, clienteNombre: nombre, telefono: tel, obra, servicios,
+      folio: await store.reservarFolio("ordenes"), clienteId: c.id, clienteNombre: nombre, telefono: tel, obra, servicios,
       descuento: 0, conIva: false, ivaPct: 16, estado, fechaIngreso: d(alta), fechaInstalacion: d(inst),
       pagos: pagos.map((monto) => ({ monto, metodo: "Transferencia", fecha: d(alta), nota: "Anticipo" })), notas: "", garantia: store.ajustes().garantia
     });
   }
   await store.save("cotizaciones", {
-    folio: store.siguienteFolio("cotizaciones"), fecha: d(-2), estado: "ABIERTA", clienteNombre: "Cliente Ejemplo Cinco", telefono: "8710000005",
+    folio: await store.reservarFolio("cotizaciones"), fecha: d(-2), estado: "ABIERTA", clienteNombre: "Cliente Ejemplo Cinco", telefono: "8710000005",
     obra: { direccion: "Calle Ficticia 505", colonia: "Col. Demo", espacio: "Toda la casa (planta baja)", m2: 72 },
     servicios: [L("Piso vinílico PVC autoadherible", 79, "m2", 260, 160), L("Instalación de piso", 72, "m2", 120, 0)],
     descuento: 500, conIva: false, ivaPct: 16, vigenciaDias: 15, notas: "Incluye retiro de muebles ligeros."

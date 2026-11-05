@@ -11,17 +11,21 @@ import { esc, money, num, $, $$ } from "./ui.js";
 import * as store from "./store.js";
 import { UNIDADES } from "./documento.js";
 
-// Totales de un documento (trabajo o cotización).
+// Redondeo a centavos. Sin esto, m² decimales × precio × IVA dejan
+// saldos fantasma (ej. $0.0041) que no se pueden liquidar.
+export const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// Totales de un documento (trabajo o cotización), siempre en centavos.
 export function totales(doc) {
   const lineas = doc.servicios || [];
-  const subtotal = lineas.reduce((s, l) => s + num(l.cantidad || 1) * num(l.precio), 0);
-  const costo = lineas.reduce((s, l) => s + num(l.cantidad || 1) * num(l.costo), 0);
-  const descuento = num(doc.descuento);
-  const base = Math.max(subtotal - descuento, 0);
-  const iva = doc.conIva ? base * (num(doc.ivaPct ?? 16) / 100) : 0;
-  const total = base + iva;
-  const pagado = (doc.pagos || []).reduce((s, p) => s + num(p.monto), 0);
-  return { subtotal, costo, descuento, iva, total, pagado, saldo: Math.max(total - pagado, 0), utilidad: base - costo };
+  const subtotal = r2(lineas.reduce((s, l) => s + r2(num(l.cantidad || 1) * num(l.precio)), 0));
+  const costo = r2(lineas.reduce((s, l) => s + num(l.cantidad || 1) * num(l.costo), 0));
+  const descuento = r2(num(doc.descuento));
+  const base = r2(Math.max(subtotal - descuento, 0));
+  const iva = doc.conIva ? r2(base * (num(doc.ivaPct ?? 16) / 100)) : 0;
+  const total = r2(base + iva);
+  const pagado = r2((doc.pagos || []).reduce((s, p) => s + num(p.monto), 0));
+  return { subtotal, costo, descuento, iva, total, pagado, saldo: r2(Math.max(total - pagado, 0)), utilidad: r2(base - costo) };
 }
 
 function rowHTML(l = {}) {

@@ -12,6 +12,7 @@ import { lineasEditorHTML, bindLineas, leerLineas, totales, resumenHTML, lineaTx
 import { abrirDocumento, obraTxt } from "../documento.js";
 import { asegurarCliente } from "./clientes.js";
 import { formOrden, detalleOrden, obraFieldsHTML, leerObra } from "./ordenes.js";
+import { reportarError } from "../errores.js";
 
 const EST = { ABIERTA: "Abierta", ACEPTADA: "Aceptada", RECHAZADA: "Rechazada" };
 let filtro = "ABIERTA";
@@ -57,9 +58,9 @@ function pintar(container) {
     .sort((a, b) => (b.folio || 0) - (a.folio || 0));
   const el = $("#lista-cot", container);
   el.innerHTML = lista.length ? `<div class="grid-cards">${lista.map((c) => `
-    <div class="card orden-card" data-id="${c.id}">
-      <div class="orden-top"><span class="folio">COT #${String(c.folio).padStart(4, "0")}</span>
-        <span class="estado c-${c.estado}">${vencida(c) ? "Vencida" : EST[c.estado]}</span></div>
+    <div class="card orden-card" data-id="${esc(c.id)}">
+      <div class="orden-top"><span class="folio">COT #${esc(String(c.folio).padStart(4, "0"))}</span>
+        <span class="estado c-${esc(c.estado)}">${vencida(c) ? "Vencida" : esc(EST[c.estado] || "")}</span></div>
       <div class="card-title">${esc(c.clienteNombre || "")}</div>
       <div class="small">${esc((c.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
       <div class="muted small">${esc(obraTxt(c.obra) || "")}${obraTxt(c.obra) ? " · " : ""}${fecha(c.fecha)}</div>
@@ -100,7 +101,7 @@ function detalleCot(id) {
     servicios: c.servicios, descuento: c.descuento, conIva: c.conIva, notas: c.notas, cotizacionId: c.id
   });
   if (act("rechazar")) act("rechazar").onclick = async () => {
-    await store.save("cotizaciones", { ...c, estado: "RECHAZADA" });
+    await store.save("cotizaciones", { ...(store.get("cotizaciones", id) || c), estado: "RECHAZADA" });
     toast("Marcada como rechazada");
     detalleCot(id);
   };
@@ -151,15 +152,29 @@ function formCotizacion(c = {}) {
   actualizar();
   $("[data-cancel]", form).onclick = closeModal;
 
+  let enviando = false; // evita cotizaciones duplicadas con doble toque
   form.onsubmit = async (e) => {
     e.preventDefault();
+    if (enviando) return;
     const f = Object.fromEntries(new FormData(form).entries());
     const servicios = leerLineas(form);
     if (!servicios.length) { toast("Agrega al menos un concepto"); return; }
+    enviando = true;
+    const btn = form.querySelector("[type=submit]");
+    btn.disabled = true;
+    let folio;
+    try {
+      folio = editando ? c.folio : await store.reservarFolio("cotizaciones");
+    } catch (err) {
+      reportarError("folio de cotización", err);
+      toast(err.message);
+      enviando = false; btn.disabled = false;
+      return;
+    }
     const cli = await asegurarCliente(f.clienteNombre, f.telefono);
     const saved = await store.save("cotizaciones", {
-      ...c,
-      folio: editando ? c.folio : store.siguienteFolio("cotizaciones"),
+      ...(editando ? (store.get("cotizaciones", c.id) || c) : {}),
+      folio,
       fecha: c.fecha || hoyISO(),
       estado: c.estado || "ABIERTA",
       clienteId: cli?.id || "",

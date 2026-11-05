@@ -11,13 +11,26 @@ import { esc, money, num, fecha, hoyISO, mesClave, toast, openModal, closeModal,
 export const CATEGORIAS = ["Material", "Herramienta", "Fletes / gasolina", "Instaladores / sueldos", "Renta", "Publicidad", "Luz / agua / internet", "Otros"];
 let mes = mesClave(hoyISO());
 
+// <select> de meses en lugar de <input type="month">, que Firefox y
+// Safari de escritorio muestran como texto libre.
+function opcionesMes() {
+  const meses = new Set(store.all("gastos").map((g) => mesClave(g.fecha)).filter((m) => /^\d{4}-\d{2}$/.test(m)));
+  const d = new Date(hoyISO() + "T12:00:00");
+  for (let i = 0; i < 12; i++) { meses.add(mesClave(d.toISOString())); d.setMonth(d.getMonth() - 1); }
+  meses.add(mes);
+  return [...meses].sort().reverse().map((m) => {
+    const txt = new Date(m + "-15T12:00:00").toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+    return `<option value="${esc(m)}" ${m === mes ? "selected" : ""}>${esc(txt)}</option>`;
+  }).join("");
+}
+
 export function renderGastos(container) {
   container.innerHTML = `
     <div class="view-head">
       <h2>Gastos</h2>
       <button class="btn btn-primary" id="nuevo-gasto">+ Nuevo gasto</button>
     </div>
-    <label class="field inline"><span>Mes</span><input class="input" type="month" id="mes-gastos" value="${mes}" /></label>
+    <label class="field inline"><span>Mes</span><select class="input" id="mes-gastos">${opcionesMes()}</select></label>
     <div id="gastos-resumen"></div>
     <div id="gastos-lista"></div>`;
 
@@ -43,7 +56,7 @@ function pintar(container) {
 
   const el = $("#gastos-lista", container);
   el.innerHTML = lista.length ? lista.map((g) => `
-    <div class="card row-card" data-id="${g.id}">
+    <div class="card row-card" data-id="${esc(g.id)}">
       <div class="grow">
         <div class="card-title">${esc(g.concepto)}</div>
         <div class="muted small">${fecha(g.fecha)} · ${esc(g.categoria)}</div>

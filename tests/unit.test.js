@@ -118,3 +118,17 @@ test("el repo no contiene teléfonos ni correos que parezcan reales", () => {
   }
   assert.deepEqual(problemas, [], "Usa datos ficticios (teléfonos 8710000xxx, correos @example.com)");
 });
+
+test("totales: sin saldos fantasma de centavos (m² decimales + IVA)", () => {
+  const doc = { servicios: [{ cantidad: 16.18, precio: 333.33 }], conIva: true, ivaPct: 16 };
+  const t = totales(doc);
+  assert.equal(t.total, 6256.2);
+  const t2 = totales({ ...doc, pagos: [{ monto: Number(t.saldo.toFixed(2)) }] });
+  assert.equal(t2.saldo, 0);
+});
+
+test("fecha: un texto que no es fecha sale escapado (anti-XSS)", async () => {
+  const { fecha } = await import("../js/ui.js");
+  assert.equal(fecha("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;");
+  assert.equal(fecha("2026-11-05"), "5 nov 2026");
+});

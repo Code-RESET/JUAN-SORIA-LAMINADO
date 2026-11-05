@@ -161,6 +161,54 @@ try {
     errores.splice(errores.findIndex((e) => e.includes("error de prueba E2E")), 1);
   });
 
+  // ---- Regresiones de bugs encontrados por revisor-bugs ----
+  await paso("folio no se reutiliza al borrar un trabajo", async () => {
+    const antes = await page.evaluate(() => Math.max(...JSON.parse(localStorage.getItem("jsl_demo_ordenes")).map((o) => o.folio)));
+    await page.goto(B + "#/ordenes/f:TODAS");
+    await page.click(`#lista-ordenes .orden-card:has(.folio:text("#${String(antes).padStart(4, "0")}"))`);
+    await page.click("[data-act=del]");
+    await page.click("#confirm [data-ok]");
+    await page.click(".tab-plus");
+    await page.fill("[name=clienteNombre]", "Cliente Ejemplo Folio");
+    await page.fill(".l-desc", "Zoclo PVC");
+    await page.click("#btn-guardar-orden");
+    await page.waitForSelector("#modal .resumen");
+    assert.equal(await page.textContent("#modal .modal-title"), `Trabajo #${String(antes + 1).padStart(4, "0")}`);
+    await page.click("#modal [data-close]");
+  });
+
+  await paso("restaurar respaldo: no pisa lo más nuevo y limpia datos manipulados", async () => {
+    const actual = await page.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_ordenes"))[0]);
+    const respaldo = {
+      app: "juan-soria-laminado",
+      ordenes: [
+        { ...actual, clienteNombre: "VERSION VIEJA", actualizado: 1 },
+        { id: "malo1", folio: "1<img>", estado: '"><img src=x onerror=window.__xss=1>', fechaIngreso: "<img src=x onerror=window.__xss=1>",
+          clienteNombre: "Cliente Ejemplo Importado", servicios: [], actualizado: 5 }
+      ]
+    };
+    await page.goto(B + "#/ajustes");
+    await page.setInputFiles("#file-restaurar", { name: "r.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(respaldo)) });
+    await page.click("#confirm [data-ok]");
+    await page.waitForTimeout(300);
+    const o = await page.evaluate((id) => JSON.parse(localStorage.getItem("jsl_demo_ordenes")).find((x) => x.id === id), actual.id);
+    assert.notEqual(o.clienteNombre, "VERSION VIEJA");
+    await page.goto(B + "#/ordenes/f:TODAS");
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => window.__xss), undefined, "no debe ejecutarse script del respaldo");
+    assert.ok(await page.isVisible("text=Cliente Ejemplo Importado"));
+  });
+
+  await paso("Ajustes: lo escrito no se borra si cambian los datos", async () => {
+    await page.goto(B + "#/ajustes");
+    await page.fill("[name=direccion]", "Dirección a medio escribir");
+    await page.click("#nuevo-serv");
+    await page.fill("#f-serv [name=nombre]", "Servicio Ejemplo");
+    await page.click("#f-serv [type=submit]");
+    await page.waitForTimeout(200);
+    assert.equal(await page.inputValue("[name=direccion]"), "Dirección a medio escribir");
+  });
+
   await paso("pantallas en teléfono", async () => {
     for (const r of ["ordenes", "clientes", "gastos"]) {
       await page.goto(B + "#/" + r);

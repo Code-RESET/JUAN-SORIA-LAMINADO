@@ -53,6 +53,13 @@ function parseHash() {
   return { path: path || MODULES[0].path, param: rest.join("/") || null };
 }
 
+// Si hay un formulario de la página a medio escribir (ej. Ajustes),
+// un cambio de datos NO repinta: se perdería lo escrito.
+content.addEventListener("input", (e) => {
+  const f = e.target.closest("form");
+  if (f) f.setAttribute("data-dirty", "");
+});
+
 function renderRoute() {
   const { path, param } = parseHash();
   const mod = MODULES.find((m) => m.path === path) || MODULES[0];
@@ -80,7 +87,10 @@ export function initRouter(user) {
     // Cuando cambian los datos (otro dispositivo o un guardado) se
     // repinta la vista actual; los modales abiertos no se tocan.
     let t;
-    onChange(() => { clearTimeout(t); t = setTimeout(renderRoute, 60); });
+    onChange(() => {
+      clearTimeout(t);
+      t = setTimeout(() => { if (!content.querySelector("form[data-dirty]")) renderRoute(); }, 60);
+    });
   }
   renderRoute();
 }

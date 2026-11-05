@@ -56,7 +56,7 @@ function pintar(container) {
     const ords = ordenesDe(c);
     const saldo = ords.reduce((s, o) => s + totales(o).saldo, 0);
     return `
-    <div class="card row-card" data-id="${c.id}">
+    <div class="card row-card" data-id="${esc(c.id)}">
       <div class="avatar">${esc(c.nombre.slice(0, 2).toUpperCase())}</div>
       <div class="grow">
         <div class="card-title">${esc(c.nombre)}</div>
@@ -90,9 +90,9 @@ function detalleCliente(id) {
     ${c.notas ? `<p class="muted">${esc(c.notas)}</p>` : ""}
     <h4 class="section-label">Historial</h4>
     ${ords.length ? ords.map((o) => `
-      <div class="card row-card" data-orden="${o.id}">
+      <div class="card row-card" data-orden="${esc(o.id)}">
         <div class="grow">
-          <div class="card-title">#${String(o.folio).padStart(4, "0")} · ${esc((o.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
+          <div class="card-title">#${esc(String(o.folio).padStart(4, "0"))} · ${esc((o.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
           <div class="muted small">${fecha(o.fechaIngreso)} · ${ESTADOS[o.estado] || ""}${obraTxt(o.obra) ? " · " + esc(obraTxt(o.obra)) : ""}</div>
         </div>
         <strong>${money(totales(o).total)}</strong>
@@ -119,7 +119,7 @@ function formCliente(c = {}) {
     e.preventDefault();
     const f = new FormData(e.target);
     const data = Object.fromEntries(f.entries());
-    await store.save("clientes", { ...c, ...data, nombre: data.nombre.trim() });
+    await store.save("clientes", { ...(c.id ? store.get("clientes", c.id) || c : {}), ...data, nombre: data.nombre.trim() });
     closeModal();
     toast("Cliente guardado");
   };
