@@ -11,13 +11,25 @@ import { reportarError, listarErrores, limpiarErrores, marcarVistos } from "../e
 import { esc, money, num, toast, openModal, closeModal, confirmar, descargar, hoyISO, $ } from "../ui.js";
 import { totales, lineaTxt } from "../lineas.js";
 import { ESTADOS, obraTxt, UNIDADES } from "../documento.js";
+import { planActivo } from "../plan.js";
+import { procesarLogo, logoValido, aplicarMarca } from "../marca.js";
 
 export function renderAjustes(container) {
   const a = store.ajustes();
   const cat = store.all("servicios").slice().sort((x, y) => x.nombre.localeCompare(y.nombre));
 
   container.innerHTML = `
-    <div class="view-head"><h2>Ajustes</h2></div>
+    <div class="view-head"><h2>Mi negocio</h2></div>
+
+    <div class="card">
+      <h3 class="card-h">Tu logo</h3>
+      <p class="muted small">Sale en tus cotizaciones y en el PDF que le mandas a tus clientes.</p>
+      <div class="logo-pick">
+        <div class="logo-prev" id="aj-logo-prev">${logoValido(a.logo) ? `<img alt="Logo" src="${esc(a.logo)}" />` : `<span class="muted small">Sin logo</span>`}</div>
+        <label class="btn btn-ghost btn-sm">📷 ${logoValido(a.logo) ? "Cambiar" : "Subir logo"}<input type="file" accept="image/*" id="aj-logo-file" hidden /></label>
+        ${logoValido(a.logo) ? `<button type="button" class="btn btn-ghost btn-sm" id="aj-logo-quitar">Quitar</button>` : ""}
+      </div>
+    </div>
 
     <div class="card">
       <h3 class="card-h">Datos del negocio</h3>
@@ -36,7 +48,7 @@ export function renderAjustes(container) {
     </div>
 
     <div class="card">
-      <div class="card-h-row"><h3 class="card-h">Catálogo de servicios</h3><button class="btn btn-ghost btn-sm" id="nuevo-serv">+ Agregar</button></div>
+      <div class="card-h-row"><h3 class="card-h">Tus materiales y precios</h3><button class="btn btn-ghost btn-sm" id="nuevo-serv">+ Agregar</button></div>
       <p class="muted small">Al escribir un producto en un trabajo o cotización, se llenan solos la unidad y el precio.</p>
       <div class="catalogo">
         ${cat.map((s) => `<div class="row-card slim" data-id="${esc(s.id)}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong>${s.m2Caja ? `<span class="muted small">📦 ${esc(s.m2Caja)} m²</span>` : ""}</div>`).join("") || `<p class="muted">Sin servicios.</p>`}
@@ -64,15 +76,30 @@ export function renderAjustes(container) {
     ${DEMO_MODE ? `
     <div class="card">
       <h3 class="card-h">Datos de ejemplo</h3>
-      <p class="muted small">Carga clientes y trabajos ficticios para ver la app llena, o borra todo para empezar desde cero.</p>
+      <p class="muted small">${planActivo() === "completo" ? "Carga clientes y trabajos ficticios para ver la app llena, o borra" : "Borra"} todo para empezar desde cero.</p>
       <div class="form-actions wrap">
-        <button class="btn btn-ghost" id="btn-ejemplo">✨ Cargar ejemplos</button>
+        ${planActivo() === "completo" ? `<button class="btn btn-ghost" id="btn-ejemplo">✨ Cargar ejemplos</button>` : ""}
         <button class="btn btn-danger" id="btn-borrar">Borrar todos los datos</button>
       </div>
     </div>` : ""}
   `;
 
   bindErrores(container);
+
+  $("#aj-logo-file", container).onchange = async (e) => {
+    try {
+      const logo = await procesarLogo(e.target.files[0]);
+      await store.save("ajustes", { ...store.ajustes(), id: "config", editado: true, logo });
+      aplicarMarca();
+      toast("Logo guardado");
+    } catch (err) { toast(err.message); reportarError("logo", err); }
+    finally { e.target.value = ""; }
+  };
+  const quitar = $("#aj-logo-quitar", container);
+  if (quitar) quitar.onclick = async () => {
+    await store.save("ajustes", { ...store.ajustes(), id: "config", logo: "" });
+    aplicarMarca();
+  };
 
   $("#f-negocio", container).onsubmit = async (e) => {
     e.preventDefault();
@@ -114,7 +141,8 @@ export function renderAjustes(container) {
   }
 
   if (DEMO_MODE) {
-    $("#btn-ejemplo", container).onclick = cargarEjemplos;
+    const ej = $("#btn-ejemplo", container);
+    if (ej) ej.onclick = cargarEjemplos;
     $("#btn-borrar", container).onclick = async () => {
       if (!(await confirmar("¿Borrar TODOS los datos de este dispositivo? Haz un respaldo antes.", "Borrar todo"))) return;
       for (const col of ["clientes", "ordenes", "cotizaciones", "gastos"]) {
@@ -165,7 +193,7 @@ function formServicio(s = {}) {
       <div class="cols-3">
         <label class="field"><span>Unidad</span><select class="input" name="unidad">${Object.entries(UNIDADES).map(([k, v]) => `<option value="${k}" ${(s.unidad || "m2") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <label class="field"><span>Precio al cliente</span><input class="input" name="precio" type="number" inputmode="decimal" step="0.01" value="${esc(s.precio ?? "")}" /></label>
-        <label class="field"><span>Costo unitario</span><input class="input" name="costo" type="number" inputmode="decimal" step="0.01" value="${esc(s.costo ?? "")}" /></label>
+        <label class="field"><span>Tu costo (solo tú lo ves)</span><input class="input" name="costo" type="number" inputmode="decimal" step="0.01" value="${esc(s.costo ?? "")}" /></label>
       </div>
       <label class="field"><span>m² por caja (opcional: pisos que se venden por caja)</span><input class="input" name="m2Caja" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ej. 2.13" value="${esc(s.m2Caja || "")}" /></label>
       <div class="form-actions">

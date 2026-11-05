@@ -4,6 +4,12 @@ PWA en HTML/JS puro (ES6 modules, sin build) para un negocio de **piso laminado,
 Basada en la estructura de *Alarmas ReSeT Pro*, con mejoras.
 Desarrollado por: Ing. Luis Ángel Díaz Bernal · Compañía: CODE-RESET
 
+## Plan de la demo: empieza con cotizaciones
+La demo arranca en **plan cotizador** (`js/plan.js`): Cotizaciones + Mi negocio. La primera vez pide nombre, logo y
+precios por m², y propone una **primera tarea**: cotizar un piso real y mandar el PDF por WhatsApp. Cada cotización
+muestra **tu ganancia** (precio − tu costo), que solo ve el dueño. Inicio, Trabajos, Clientes y Gastos se ven con 🔒
+y se desbloquean con `PLAN = "completo"`.
+
 ## Secciones
 | Sección | Qué hace |
 |---|---|

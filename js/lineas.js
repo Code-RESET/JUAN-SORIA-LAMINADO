@@ -70,7 +70,7 @@ function rowHTML(l = {}) {
       <label><span>Cantidad</span><input class="input l-cant" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(l.cantidad || 1)}" /></label>
       <label><span>Unidad</span><select class="input l-unidad">${Object.entries(UNIDADES).map(([k, v]) => `<option value="${k}" ${k === u ? "selected" : ""}>${v}</option>`).join("")}</select></label>
       <label><span>Precio unit.</span><input class="input l-precio" type="number" inputmode="decimal" step="0.01" value="${esc(l.precio ?? "")}" placeholder="0" /></label>
-      <label><span>Costo unit.</span><input class="input l-costo" type="number" inputmode="decimal" step="0.01" value="${esc(l.costo ?? "")}" placeholder="0" /></label>
+      <label><span>Tu costo</span><input class="input l-costo" type="number" inputmode="decimal" step="0.01" value="${esc(l.costo ?? "")}" placeholder="0" /></label>
       <button type="button" class="icon-btn l-del" title="Quitar">✕</button>
     </div>
     <div class="l-cajas muted small"${l.cajas ? "" : " hidden"}>📦 ${esc(l.cajas || "")} cajas completas</div>
@@ -283,6 +283,22 @@ export function resumenHTML(t, { conPagos = false } = {}) {
       ${conPagos ? `
         <div><span>Pagado</span><span class="pos">${money(t.pagado)}</span></div>
         <div class="saldo"><span>Saldo</span><span>${money(t.saldo)}</span></div>` : ""}
-      <div class="muted small"><span>Utilidad estimada (sin IVA)</span><span>${money(t.utilidad)}</span></div>
+    </div>
+    ${gananciaHTML(t)}`;
+}
+
+// Cuánto gana el negocio en este trabajo: precio sin IVA − su costo.
+// Es el "puente" al paquete completo: ver su ganancia por trabajo.
+export function gananciaHTML(t) {
+  const base = Math.max(t.subtotal - t.descuento, 0);
+  if (!base) return "";
+  if (!t.costo) {
+    return `<div class="ganancia vacia">💡 Pon <b>tu costo</b> en cada concepto y aquí verás cuánto ganas en este trabajo.</div>`;
+  }
+  const pct = Math.round((t.utilidad / base) * 100);
+  return `
+    <div class="ganancia ${t.utilidad < 0 ? "neg" : ""}">
+      <div><span>Tu ganancia en este trabajo</span><strong>${money(t.utilidad)}</strong></div>
+      <div class="muted small">${pct}% de la venta (sin IVA) · costo ${money(t.costo)} · solo tú lo ves, no sale en el PDF</div>
     </div>`;
 }

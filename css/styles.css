@@ -151,7 +151,7 @@ body.nav-open .nav-backdrop { display: block; }
 
 @media (min-width: 900px) {
   .sidebar { transform: none; }
-  .nav-backdrop, .tabbar, .menu-btn, .app-header .brand-name { display: none !important; }
+  .nav-backdrop, .tabbar, .menu-btn, .app-header .brand-name, .app-header .header-logo-cliente { display: none !important; }
   .app-header { margin-left: var(--sidebar-w); min-height: 0; padding: 0; border: 0; background: none; position: static; }
   .app-content { margin-left: var(--sidebar-w); padding: 28px 32px 48px; max-width: none; }
   .app-content > * { max-width: 1100px; }
@@ -340,3 +340,62 @@ body.nav-open .nav-backdrop { display: block; }
   .doc-frame { padding: 0; overflow: visible; }
   .doc { padding: 0; max-width: none; }
 }
+
+/* ---------- Marca del cliente ---------- */
+.brand-name-cliente { font-family: var(--font); font-weight: 800; letter-spacing: .3px; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.sidebar-brand .brand-name-cliente { white-space: normal; line-height: 1.25; }
+.brand-logo { display: block; max-width: 140px; max-height: 56px; object-fit: contain; margin-bottom: 8px; background: #fff; border-radius: 8px; padding: 4px; }
+.header-logo-cliente { height: 30px; max-width: 80px; object-fit: contain; background: #fff; border-radius: 6px; padding: 2px; flex: none; }
+.login-logo-cliente { display: block; margin: 0 auto 10px; max-width: 160px; max-height: 72px; object-fit: contain; background: #fff; border-radius: 10px; padding: 6px; }
+.doc-marca { display: flex; gap: 12px; align-items: flex-start; }
+.doc-logo { max-width: 150px; max-height: 70px; object-fit: contain; }
+
+/* ---------- Plan cotizador: menú y secciones bloqueadas ---------- */
+.tabbar.tabbar-3 { grid-template-columns: 1fr 1fr 1fr; }
+.nav-lock { margin-left: auto; font-size: .75rem; opacity: .8; }
+.app-nav a.locked { opacity: .55; }
+.nav-pro { font-size: .55rem; letter-spacing: .8px; background: rgba(154,205,50,.15); color: var(--accent); border-radius: 99px; padding: 1px 6px; margin-left: 4px; }
+.bloqueado { max-width: 520px; margin: 24px auto; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.bloq-icon { font-size: 2.4rem; }
+.bloq-lista { list-style: none; padding: 0; margin: 4px 0 8px; text-align: left; display: grid; gap: 8px; }
+.bloq-lista li { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.locked-btn { opacity: .7; }
+
+/* ---------- Bienvenida (onboarding) ---------- */
+body.en-bienvenida .tabbar { display: none; }
+.onb { max-width: 720px; margin: 0 auto; }
+.onb-head { margin-bottom: 14px; }
+.onb-head h2 { margin: 10px 0 4px; }
+.onb-pasos { display: flex; align-items: center; gap: 6px; }
+.onb-pasos span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; font-weight: 700; background: var(--bg-2); color: var(--text-dim); border: 1px solid var(--border); }
+.onb-pasos span.on { background: var(--accent); color: #000; border-color: var(--accent); }
+.onb-pasos i { width: 30px; height: 2px; background: var(--border); }
+.logo-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.logo-prev { width: 120px; height: 64px; border: 1px dashed var(--border); border-radius: 10px; display: grid; place-items: center; overflow: hidden; background: #fff; }
+.logo-prev img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.logo-prev .muted { color: #888; }
+.mat { display: grid; grid-template-columns: 1fr 76px 92px 92px auto; gap: 6px; align-items: center; margin-bottom: 8px; }
+.mat-head { margin-bottom: 4px; }
+@media (max-width: 560px) {
+  .mat { grid-template-columns: 1fr 1fr 1fr auto; background: var(--bg-2); border-radius: 10px; padding: 8px; }
+  .mat .m-nombre { grid-column: 1 / -1; }
+  .mat-head { display: none; }
+}
+
+/* ---------- Primera tarea ---------- */
+.tarea { border-color: rgba(154,205,50,.45); background: linear-gradient(180deg, rgba(154,205,50,.08), var(--bg-card)); margin-bottom: 18px; }
+.tarea-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tarea-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.tarea-lista li { display: flex; gap: 10px; align-items: flex-start; }
+.tarea-lista .tick { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: .75rem; font-weight: 800; margin-top: 1px; }
+.tarea-lista li.ok .tick { background: var(--accent); border-color: var(--accent); color: #000; }
+.tarea-lista li.ok b { text-decoration: line-through; color: var(--text-dim); }
+.tarea-lista .btn { margin-top: 6px; }
+
+/* ---------- Ganancia por trabajo ---------- */
+.ganancia { border: 1px solid rgba(74,222,128,.4); background: rgba(74,222,128,.07); border-radius: 10px; padding: 10px 12px; margin: -2px 0 12px; }
+.ganancia > div:first-child { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ganancia strong { color: var(--ok); font-size: 1.15rem; }
+.ganancia.neg { border-color: rgba(248,113,113,.4); background: rgba(248,113,113,.07); }
+.ganancia.neg strong { color: var(--bad); }
+.ganancia.vacia { border-style: dashed; border-color: var(--border); background: none; color: var(--text-dim); font-size: .85rem; }

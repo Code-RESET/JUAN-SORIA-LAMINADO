@@ -13,6 +13,8 @@ import { abrirDocumento, obraTxt } from "../documento.js";
 import { asegurarCliente } from "./clientes.js";
 import { formOrden, detalleOrden, obraFieldsHTML, leerObra } from "./ordenes.js";
 import { reportarError } from "../errores.js";
+import { desbloqueado } from "../plan.js";
+import { primeraTareaHTML, bindPrimeraTarea } from "./bienvenida.js";
 
 const EST = { ABIERTA: "Abierta", ACEPTADA: "Aceptada", RECHAZADA: "Rechazada" };
 let filtro = "ABIERTA";
@@ -26,6 +28,7 @@ function vencida(c) {
 
 export function renderCotizaciones(container, user, param) {
   container.innerHTML = `
+    ${primeraTareaHTML()}
     <div class="view-head">
       <h2>Cotizaciones</h2>
       <button class="btn btn-primary" id="nueva-cot">+ Nueva cotización</button>
@@ -36,6 +39,7 @@ export function renderCotizaciones(container, user, param) {
     </div>
     <div id="lista-cot"></div>`;
 
+  bindPrimeraTarea(container);
   $("#nueva-cot", container).onclick = () => formCotizacion();
   $("#filtros-cot", container).onclick = (e) => {
     const b = e.target.closest("[data-f]");
@@ -64,7 +68,7 @@ function pintar(container) {
       <div class="card-title">${esc(c.clienteNombre || "")}</div>
       <div class="small">${esc((c.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
       <div class="muted small">${esc(obraTxt(c.obra) || "")}${obraTxt(c.obra) ? " · " : ""}${fecha(c.fecha)}</div>
-      <div class="orden-bottom"><strong>${money(totales(c).total)}</strong></div>
+      <div class="orden-bottom"><strong>${money(totales(c).total)}</strong>${totales(c).costo ? `<span class="pill ok" title="Tu ganancia (solo tú la ves)">+${money(totales(c).utilidad)}</span>` : ""}</div>
     </div>`).join("")}</div>` : emptyState("📄", "No hay cotizaciones en este filtro.");
   el.querySelectorAll("[data-id]").forEach((n) => (n.onclick = () => detalleCot(n.dataset.id)));
 }
@@ -85,8 +89,10 @@ function detalleCot(id) {
     ${c.notas ? `<p class="muted">${esc(c.notas)}</p>` : ""}
     <div class="form-actions wrap">
       ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver trabajo</button>`
-        : `<button class="btn btn-primary" data-act="convertir">✅ Convertir en trabajo</button>`}
-      <button class="btn btn-ghost" data-act="doc">📄 PDF / WhatsApp</button>
+        : desbloqueado("ordenes")
+          ? `<button class="btn btn-primary" data-act="convertir">✅ Convertir en trabajo</button>`
+          : `<a class="btn btn-ghost locked-btn" href="#/ordenes" title="Paquete completo">🔒 Convertir en trabajo</a>`}
+      <button class="btn ${desbloqueado("ordenes") ? "btn-ghost" : "btn-primary"}" data-act="doc">📄 PDF / WhatsApp</button>
       <button class="btn btn-ghost" data-act="edit">✏️ Editar</button>
       ${c.estado === "ABIERTA" ? `<button class="btn btn-ghost" data-act="rechazar">Rechazada</button>` : ""}
       <button class="btn btn-danger" data-act="del">🗑️</button>

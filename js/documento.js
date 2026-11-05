@@ -13,6 +13,8 @@
 import { esc, money, fecha, waLink, toast, descargar } from "./ui.js";
 import { generarPDF, nombreArchivo } from "./pdf.js";
 import { reportarError } from "./errores.js";
+import { logoValido } from "./marca.js";
+import { marcarPdfEnviado } from "./modules/bienvenida.js";
 import { totales } from "./lineas.js";
 import * as store from "./store.js";
 
@@ -46,9 +48,12 @@ export function abrirDocumento(tipo, doc) {
   const html = `
   <div class="doc">
     <div class="doc-head">
-      <div>
+      <div class="doc-marca">
+        ${logoValido(a.logo) ? `<img class="doc-logo" alt="" src="${esc(a.logo)}" />` : ""}
+        <div>
         <div class="doc-negocio">${esc(a.negocio)}</div>
         <div class="doc-sub">${esc(a.direccion)}${a.direccion && a.telefono ? " · " : ""}${a.telefono ? "Tel. " + esc(a.telefono) : ""}</div>
+        </div>
       </div>
       <div class="doc-folio"><div>${titulo}</div><strong>#${folio}</strong><div>${fecha(doc.fecha || doc.fechaIngreso)}</div></div>
     </div>
@@ -105,7 +110,7 @@ function prepararPDF(tipo, doc, a, t) {
   generarPDF(tipo, doc).then((blob) => {
     if (id !== generacion) return; // ya se abrió otro documento
     const nombre = nombreArchivo(tipo, doc);
-    actual = { archivo: new File([blob], nombre, { type: "application/pdf" }), blob, nombre, mensaje, telefono: doc.telefono, titulo: `${que} #${folio}` };
+    actual = { tipo, archivo: new File([blob], nombre, { type: "application/pdf" }), blob, nombre, mensaje, telefono: doc.telefono, titulo: `${que} #${folio}` };
     share.disabled = down.disabled = false;
     share.textContent = "📲 Enviar PDF";
   }).catch((e) => {
@@ -121,8 +126,15 @@ function puedeCompartirArchivo(file) {
 
 let compartiendo = false; // evita un 2º share() con el menú aún abierto (doble clic en PC)
 
-function respaldoWhatsApp({ blob, nombre, mensaje, telefono }, abrirWA) {
+// Primera tarea del plan cotizador: "manda el PDF de una cotización".
+function pdfEntregado(datos) {
+  if (datos.tipo === "cotizacion") marcarPdfEnviado().catch((e) => reportarError("primera tarea", e));
+}
+
+function respaldoWhatsApp(datos, abrirWA) {
+  const { blob, nombre, mensaje, telefono } = datos;
   descargar(nombre, blob, "application/pdf");
+  pdfEntregado(datos);
   if (telefono && abrirWA) window.open(waLink(telefono, mensaje + " (Le adjunto el PDF)"), "_blank", "noopener");
   toast(abrirWA ? "PDF descargado: adjúntalo en el chat de WhatsApp" : "PDF descargado: compártelo desde tus descargas");
 }
@@ -140,6 +152,7 @@ async function enviarPDF() {
     // Solo el archivo (+título): en iPhone, mandar texto junto con el
     // archivo hace que algunas apps descarten el PDF.
     await navigator.share({ files: [datos.archivo], title: datos.titulo });
+    pdfEntregado(datos);
   } catch (e) {
     if (e?.name !== "AbortError") { // AbortError = el usuario cerró el menú
       reportarError("compartir PDF", e);
@@ -156,7 +169,7 @@ export function initDocumento() {
   ov.querySelector("[data-doc-print]").addEventListener("click", () => window.print());
   ov.querySelector("[data-doc-share]").addEventListener("click", enviarPDF);
   ov.querySelector("[data-doc-download]").addEventListener("click", () => {
-    if (actual) { descargar(actual.nombre, actual.blob, "application/pdf"); toast("PDF descargado"); }
+    if (actual) { descargar(actual.nombre, actual.blob, "application/pdf"); pdfEntregado(actual); toast("PDF descargado"); }
   });
   ov.querySelector("[data-doc-close]").addEventListener("click", () => {
     ov.hidden = true;

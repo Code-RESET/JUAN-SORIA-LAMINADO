@@ -246,6 +246,8 @@ function limpiarImportado(col, item) {
   for (const k of ["nombre", "clienteNombre", "telefono", "concepto", "categoria", "negocio"]) if (k in x) x[k] = String(x[k] ?? "");
   if ((col === "clientes" || col === "servicios") && !String(x.nombre ?? "").trim()) return null;
   if (col === "ajustes" && x.id !== "config") return null;
+  if (col === "ajustes" && "logo" in x && !(typeof x.logo === "string" && x.logo.length < 900000 &&
+      /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x.logo))) x.logo = "";
   return x;
 }
 

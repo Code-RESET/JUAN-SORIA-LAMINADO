@@ -43,10 +43,19 @@ const paso = async (nombre, fn) => {
 };
 
 // CHROME_PATH permite usar un Chromium ya instalado (opcional).
+// Plan completo + bienvenida ya hecha: así se prueban todas las secciones.
+// (El recorrido del plan "cotizador" tiene su propia sección al final.)
+const PLAN_COMPLETO = () => {
+  try {
+    localStorage.setItem("jsl_plan", "completo");
+    if (!localStorage.getItem("jsl_demo_ajustes")) localStorage.setItem("jsl_demo_ajustes", JSON.stringify([{ id: "config", onboarding: true }]));
+  } catch {}
+};
 const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
 const errores = [];
 try {
   const ctx = await browser.newContext({ ...devices["iPhone 13"], serviceWorkers: "block" });
+  await ctx.addInitScript(PLAN_COMPLETO);
   const page = await ctx.newPage();
   page.on("pageerror", (e) => errores.push(e.message));
   page.on("dialog", (d) => { errores.push("dialog: " + d.message()); d.accept(); });
@@ -332,6 +341,7 @@ try {
 
   await paso("respaldo en dispositivo nuevo: toma datos del negocio y catálogo; ivaPct malicioso neutralizado", async () => {
     const c2 = await browser.newContext({ ...devices["iPhone 13"], serviceWorkers: "block" });
+    await c2.addInitScript(PLAN_COMPLETO);
     const p = await c2.newPage();
     p.on("pageerror", (e) => errores.push("nuevo: " + e.message));
     await p.goto(B);
@@ -380,6 +390,7 @@ try {
 
   await paso("vista de PC", async () => {
     const d = await browser.newContext({ viewport: { width: 1366, height: 860 }, serviceWorkers: "block" });
+    await d.addInitScript(PLAN_COMPLETO);
     const p2 = await d.newPage();
     p2.on("pageerror", (e) => errores.push("pc: " + e.message));
     await p2.goto(B);
@@ -391,6 +402,131 @@ try {
     assert.ok(await p2.isVisible(".sidebar"));
     await p2.screenshot({ path: `${OUT}/7-pc.png` });
   });
+
+  // ================= PLAN COTIZADOR (la demo de Juan) =================
+  const cj = await browser.newContext({ ...devices["iPhone 13"], serviceWorkers: "block", acceptDownloads: true });
+  const j = await cj.newPage();
+  j.on("pageerror", (e) => errores.push("cotizador: " + e.message));
+  j.on("dialog", (d) => { errores.push("cotizador dialog: " + d.message()); d.accept(); });
+
+  await paso("cotizador: la primera vez pide negocio y logo (sin datos de ejemplo)", async () => {
+    await j.goto(B);
+    await j.click("#login-btn");
+    await j.waitForSelector("#onb-negocio");
+    assert.equal(await j.evaluate(() => location.hash), "#/bienvenida");
+    assert.equal(await j.locator("#btn-ejemplo").count(), 0);
+    await j.fill("[name=negocio]", "Pisos Ejemplo Soria");
+    await j.fill("[name=telefono]", "8710000001");
+    await j.setInputFiles("#logo-file", join(ROOT, "assets", "icon-192.png"));
+    await j.waitForSelector("#logo-prev img");
+    await j.screenshot({ path: `${OUT}/c1-bienvenida.png` });
+    await j.click("#onb-negocio [type=submit]");
+    await j.waitForSelector("#onb-mat");
+    assert.equal(await j.textContent(".app-header [data-marca-nombre]"), "Pisos Ejemplo Soria");
+    assert.ok(await j.isVisible(".app-header img[data-marca-logo]"), "logo en la cabecera");
+  });
+
+  await paso("cotizador: sus materiales y precio por m² (solo se guardan los que tienen precio)", async () => {
+    const err = j.locator("#mat-err");
+    await j.click("#onb-mat [type=submit]");               // sin ningún precio -> aviso
+    assert.ok(await err.isVisible());
+    const filas = j.locator("#mats .mat");
+    const n = await filas.count();
+    let spc = -1;
+    for (let i = 0; i < n; i++) if ((await filas.nth(i).locator(".m-nombre").inputValue()).startsWith("Piso SPC")) spc = i;
+    await filas.nth(spc).locator(".m-precio").fill("450");
+    await filas.nth(spc).locator(".m-costo").fill("300");
+    await j.click("#mat-add");
+    await filas.last().locator(".m-nombre").fill("Instalación ejemplo");
+    await filas.last().locator(".m-precio").fill("110");
+    await j.screenshot({ path: `${OUT}/c2-materiales.png` });
+    await j.click("#onb-mat [type=submit]");
+    await j.waitForSelector(".tarea");
+    const serv = await j.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_servicios")).map((x) => `${x.nombre}:${x.precio}`).sort());
+    assert.deepEqual(serv, ["Instalación ejemplo:110", "Piso SPC 5 mm (click):450"]);
+  });
+
+  await paso("cotizador: menú con Cotizaciones y Mi negocio; lo demás con 🔒", async () => {
+    assert.equal(await j.evaluate(() => location.hash), "#/cotizaciones");
+    assert.equal(await j.locator("#app-nav a.locked").count(), 4);
+    assert.equal(await j.locator("#tabbar a").count(), 3);
+    await j.goto(B + "#/ordenes");
+    await j.waitForSelector(".bloqueado");
+    assert.match(await j.textContent(".bloqueado"), /paquete completo/i);
+    await j.screenshot({ path: `${OUT}/c3-bloqueado.png` });
+    await j.goto(B + "#/ordenes/nueva");                   // ni por URL se abre
+    await j.waitForSelector(".bloqueado");
+    assert.equal(await j.locator("#f-orden").count(), 0);
+  });
+
+  await paso("cotizador: primera tarea — cotizar un piso real y ver la ganancia", async () => {
+    await j.goto(B + "#/cotizaciones");
+    await j.waitForSelector(".tarea");
+    await j.screenshot({ path: `${OUT}/c4-tarea.png`, fullPage: true });
+    await j.click(".tarea a.btn");
+    await j.waitForSelector("#f-cot");
+    await j.fill("[name=clienteNombre]", "Cliente Ejemplo Prueba");
+    await j.fill(".l-desc", "Piso SPC 5 mm (click)");
+    assert.equal(await j.inputValue(".l-precio"), "450");
+    await j.click("#toggle-calc");
+    await j.fill(".c-a", "4"); await j.fill(".c-b", "3");  // 12 m² + 10% = 13.2 m²
+    await j.click("#calc-usar");
+    const g = (await j.textContent("#resumen-cot")).replace(/\s+/g, " ");
+    // 13.2 × 450 = 5,940 ; costo 13.2 × 300 = 3,960 ; ganancia 1,980 (33%)
+    assert.match(g, /TOTAL\$5,940\.00/);
+    assert.match(g, /Tu ganancia en este trabajo\$1,980\.00/);
+    await j.screenshot({ path: `${OUT}/c5-cotizacion.png` });
+    await j.click("#f-cot [type=submit]");
+    await j.waitForSelector("#modal .ganancia");
+    assert.equal(await j.locator("[data-act=convertir]").count(), 0, "convertir en trabajo bloqueado");
+    assert.ok(await j.isVisible(".locked-btn"));
+  });
+
+  await paso("cotizador: el PDF lleva su logo y la ganancia NO sale en el PDF", async () => {
+    await j.click("[data-act=doc]");
+    await j.waitForSelector("[data-doc-share]:not([disabled])", { timeout: 15000 });
+    assert.ok(await j.isVisible(".doc .doc-logo"));
+    const b64 = await j.evaluate(async () => {
+      const { _pdfActual } = await import("/js/documento.js");
+      const buf = new Uint8Array(await _pdfActual().blob.arrayBuffer());
+      let s = ""; buf.forEach((c) => (s += String.fromCharCode(c))); return btoa(s);
+    });
+    const pdf = Buffer.from(b64, "base64");
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(`${OUT}/cotizacion-cotizador.pdf`, pdf);
+    assert.match(pdf.toString("latin1"), /\/Subtype\s*\/Image/, "el PDF debe incluir el logo");
+    const { execFileSync } = await import("node:child_process");
+    try {
+      const texto = execFileSync("pdftotext", [`${OUT}/cotizacion-cotizador.pdf`, "-"]).toString();
+      assert.match(texto, /Pisos Ejemplo Soria/);
+      assert.doesNotMatch(texto, /ganancia|3,960|1,980/i, "costos y ganancia no deben ir al cliente");
+    } catch (e) { if (e.code !== "ENOENT") throw e; }
+  });
+
+  await paso("cotizador: al mandar el PDF la primera tarea queda completa", async () => {
+    await j.evaluate(() => { navigator.canShare = () => true; navigator.share = async () => {}; });
+    await j.click("[data-doc-share]");
+    await j.waitForFunction(() => JSON.parse(localStorage.getItem("jsl_demo_ajustes"))[0].primerPdf === true);
+    await j.click("[data-doc-close]");
+    await j.click("#modal [data-close]");
+    await j.waitForSelector(".tarea [data-tarea-cerrar]");
+    assert.match(await j.textContent(".tarea"), /Primera tarea completa/);
+    await j.screenshot({ path: `${OUT}/c6-tarea-completa.png` });
+    await j.click("[data-tarea-cerrar]");
+    await j.waitForFunction(() => !document.querySelector(".tarea"));
+  });
+
+  await paso("cotizador: logo y nombre en el login al volver a entrar", async () => {
+    await j.click("#menu-btn");
+    await j.click("#logout-btn");
+    await j.waitForSelector("#login-screen:not([hidden])");
+    await j.reload();
+    await j.waitForSelector("#login-screen:not([hidden])");
+    assert.equal(await j.textContent(".login-title"), "Pisos Ejemplo Soria");
+    assert.ok(await j.isVisible("#login-logo-cliente"));
+    await j.screenshot({ path: `${OUT}/c7-login.png` });
+  });
+  await cj.close();
 
   await paso("sin errores de JavaScript en toda la prueba", async () => {
     assert.deepEqual(errores, []);

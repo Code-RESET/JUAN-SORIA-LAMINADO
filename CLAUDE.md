@@ -49,6 +49,16 @@ Logo pequeño + "Desarrollado por: Ing. Luis Ángel Díaz Bernal" + "Compañía:
 Angel es el arquitecto/product owner: revisa, prueba y despliega, pero no escribe todo
 el código a mano. Explica brevemente el "por qué" de las decisiones técnicas.
 
+## Este proyecto: plan de venta (js/plan.js)
+- La demo arranca en `PLAN = "cotizador"`: solo Cotizaciones y Mi negocio. Inicio, Trabajos,
+  Clientes y Gastos se ven con 🔒 y una explicación, sin pedirle al cliente que los use.
+- Primera vez: Bienvenida (nombre, logo, materiales y precio por m²) y "primera tarea":
+  cotizar un piso real y mandar el PDF por WhatsApp. Sin datos de ejemplo en este plan.
+- Al cerrar la venta: `PLAN = "completo"`, subir CACHE_VERSION y publicar.
+- En localhost se puede probar el plan completo con localStorage `jsl_plan = "completo"`
+  (las pruebas e2e lo usan); en el link público manda la constante.
+- `CONTACTO.whatsapp` en plan.js: número de Code-Reset para el botón "Me interesa".
+
 ## Este proyecto: Juan Soria (pisos y decoración)
 Giro: piso laminado, PVC, SPC, persianas, paneles y decoración. NO es taller de autos.
 Trabajos con obra (dirección, espacios, m²), conceptos con unidad (m², ml, pza, caja) y

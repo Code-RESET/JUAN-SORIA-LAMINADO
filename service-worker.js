@@ -6,7 +6,7 @@
 // Subir CACHE_VERSION cada vez que cambien archivos base.
 // ============================================================
 
-const CACHE_VERSION = "juan-soria-v13";
+const CACHE_VERSION = "juan-soria-v14";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -16,6 +16,9 @@ const CORE_ASSETS = [
   "./js/router.js",
   "./js/store.js",
   "./js/ui.js",
+  "./js/plan.js",
+  "./js/marca.js",
+  "./js/modules/bienvenida.js",
   "./js/errores.js",
   "./js/lineas.js",
   "./js/documento.js",

@@ -25,6 +25,7 @@
 <section id="login-screen" class="screen" hidden>
   <div class="login-card">
     <img src="assets/logo.svg" alt="Code-Reset" class="login-logo" />
+    <img id="login-logo-cliente" class="login-logo-cliente" alt="" hidden />
     <h1 class="login-title">JUAN SORIA</h1>
     <p class="login-subtitle">Pisos laminados · Persianas · Decoración</p>
 
@@ -55,8 +56,8 @@
 <section id="app-shell" class="screen" hidden>
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-name">JUAN SORIA</div>
-      <div class="brand-sub">Pisos y Decoración</div>
+      <img class="brand-logo" data-marca-logo alt="" hidden />
+      <div class="brand-name brand-name-cliente" data-marca-nombre>JUAN SORIA</div>
     </div>
     <nav id="app-nav" class="app-nav"></nav>
     <div class="sidebar-foot">
@@ -69,7 +70,8 @@
 
   <header class="app-header">
     <button id="menu-btn" class="icon-btn menu-btn" aria-label="Menú">☰</button>
-    <div class="brand-name">JUAN SORIA</div>
+    <img class="header-logo-cliente" data-marca-logo alt="" hidden />
+    <div class="brand-name brand-name-cliente" data-marca-nombre>JUAN SORIA</div>
     <span id="net-badge" class="net-badge" hidden>Sin conexión</span>
     <a id="err-badge" class="err-badge" href="#/ajustes" title="Errores registrados — ver en Ajustes" hidden>⚠ 0</a>
   </header>

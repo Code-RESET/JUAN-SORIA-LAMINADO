@@ -13,6 +13,7 @@ import { initRouter } from "./router.js";
 import { initStore, stopStore } from "./store.js";
 import { initDocumento } from "./documento.js";
 import { closeModal } from "./ui.js";
+import { marcaEnLogin } from "./marca.js";
 
 const DEMO_USER = { email: "demo@example.com", password: "demo2026" };
 const SESSION_KEY = "jsl_demo_session";
@@ -51,6 +52,7 @@ function salir() {
 }
 
 initDocumento();
+marcaEnLogin();
 document.getElementById("env-banner").hidden = ENTORNO !== "prueba";
 
 // Menú lateral en teléfono

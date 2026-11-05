@@ -14,6 +14,7 @@ import { money, fecha } from "./ui.js";
 import { totales } from "./lineas.js";
 import * as store from "./store.js";
 import { ESTADOS, UNIDADES, obraTxt } from "./documento.js";
+import { logoValido } from "./marca.js";
 
 let cargando = null;
 function cargarJsPDF() {
@@ -67,13 +68,27 @@ export async function generarPDF(tipo, doc) {
   // ---------- Encabezado ----------
   const titulo = esOrden ? "ORDEN DE TRABAJO" : "COTIZACIÓN";
   const folio = "#" + String(doc.folio || "").padStart(4, "0");
+  // Logo del cliente (si lo subió): máx. 40 × 20 mm, a la izquierda.
+  let xTxt = M, altoLogo = 0;
+  if (logoValido(a.logo)) {
+    try {
+      const fmt = a.logo.startsWith("data:image/png") ? "PNG" : a.logo.startsWith("data:image/webp") ? "WEBP" : "JPEG";
+      const p = pdf.getImageProperties(a.logo);
+      const k = Math.min(40 / p.width, 20 / p.height);
+      const lw = p.width * k, lh = p.height * k;
+      pdf.addImage(a.logo, fmt, M, y, lw, lh);
+      xTxt = M + lw + 5; altoLogo = lh;
+    } catch { /* logo ilegible: el PDF sale sin él */ }
+  }
+  const anchoTxt = ancho - 62 - (xTxt - M);
   set(15, "bold");
-  const negocio = pdf.splitTextToSize(txt(a.negocio), ancho - 62);
-  pdf.text(negocio, M, y + 5);
+  const negocio = pdf.splitTextToSize(txt(a.negocio), anchoTxt);
+  pdf.text(negocio, xTxt, y + 5);
   let yIzq = y + 5 + negocio.length * 6;
   set(9, "normal", GRIS);
   const contacto = [a.direccion, a.telefono ? "Tel. " + a.telefono : ""].filter(Boolean).map(txt);
-  contacto.forEach((l) => { pdf.splitTextToSize(l, ancho - 62).forEach((p) => { pdf.text(p, M, yIzq); yIzq += 4.2; }); });
+  contacto.forEach((l) => { pdf.splitTextToSize(l, anchoTxt).forEach((p) => { pdf.text(p, xTxt, yIzq); yIzq += 4.2; }); });
+  yIzq = Math.max(yIzq, y + altoLogo + 2);
 
   set(9, "normal", GRIS);
   pdf.text(titulo, W - M, y + 3, { align: "right" });
