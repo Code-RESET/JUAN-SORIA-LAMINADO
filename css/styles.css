@@ -399,3 +399,5 @@ body.en-bienvenida .tabbar { display: none; }
 .ganancia.neg { border-color: rgba(248,113,113,.4); background: rgba(248,113,113,.07); }
 .ganancia.neg strong { color: var(--bad); }
 .ganancia.vacia { border-style: dashed; border-color: var(--border); background: none; color: var(--text-dim); font-size: .85rem; }
+/* Login: si se ve el logo del negocio, el título repetiría lo mismo */
+.login-logo-cliente:not([hidden]) + .login-title { display: none; }

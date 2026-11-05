@@ -68,5 +68,7 @@ export function marcaEnLogin() {
   const t = document.querySelector(".login-title");
   if (t && m.nombre) t.textContent = m.nombre;
   const img = document.getElementById("login-logo-cliente");
-  if (img && logoValido(m.logo)) { img.src = m.logo; img.hidden = false; }
+  if (!img) return;
+  if (logoValido(m.logo)) { img.src = m.logo; img.hidden = false; }
+  else img.hidden = true; // quitó su logo
 }

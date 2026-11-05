@@ -14,6 +14,7 @@
 
 import { DEMO_MODE, getFirebase } from "./firebase-config.js";
 import { reportarError } from "./errores.js";
+import { LOGO_DEFAULT } from "./logo-default.js";
 
 export const COLLECTIONS = ["clientes", "ordenes", "cotizaciones", "gastos", "servicios", "ajustes"];
 const LS_PREFIX = "jsl_";
@@ -176,7 +177,8 @@ export async function remove(col, id) {
 // ---------- Ajustes del negocio (un solo documento) ----------
 const DEFAULT_AJUSTES = {
   id: "config",
-  negocio: "Juan Soria · Pisos y Decoración",
+  negocio: "Soria · Piso laminado y duela",
+  logo: LOGO_DEFAULT, // assets/logo-soria.jpg; el cliente lo cambia o quita en Mi negocio
   telefono: "",
   direccion: "",
   ivaPct: 16,

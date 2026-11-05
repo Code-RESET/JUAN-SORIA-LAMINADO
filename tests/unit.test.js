@@ -99,6 +99,7 @@ test("el repo no contiene teléfonos ni correos que parezcan reales", () => {
   const recorrer = (d) => readdirSync(d).forEach((f) => {
     if (["node_modules", ".git", "capturas", "assets"].includes(f)) return;
     if (f === "jspdf.umd.min.js") return; // librería de terceros (MIT), sin datos de clientes
+    if (f === "logo-default.js") return;  // imagen en base64 (generada), no contiene datos
     const p = join(d, f);
     if (statSync(p).isDirectory()) recorrer(p);
     else if (/\.(js|html|json|md|rules)$/.test(f) && f !== "package-lock.json") archivos.push(p);

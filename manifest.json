@@ -1,17 +1,32 @@
 {
-  "name": "Juan Soria · Pisos y Decoración",
-  "short_name": "Juan Soria",
+  "name": "Soria · Piso laminado y duela",
+  "short_name": "Soria",
   "description": "Pisos laminados, SPC, PVC, persianas y decoración: trabajos, cotizaciones, clientes y gastos. Desarrollado por Code-Reset — Ing. Luis Ángel Díaz Bernal",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#000000",
+  "background_color": "#7a2f17",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
   "lang": "es-MX",
   "icons": [
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
