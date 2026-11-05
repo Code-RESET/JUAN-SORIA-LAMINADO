@@ -14,13 +14,14 @@ import { renderGastos } from "./modules/gastos.js";
 import { renderAjustes } from "./modules/ajustes.js";
 import { onChange } from "./store.js";
 import { esc } from "./ui.js";
+import { reportarError } from "./errores.js";
 
 // group -> título de sección en el menú
 const MODULES = [
   { path: "dashboard", label: "Inicio", icon: "📊", group: "PRINCIPAL", render: renderDashboard },
-  { path: "ordenes", label: "Órdenes", icon: "🚗", group: "TALLER", render: renderOrdenes },
-  { path: "cotizaciones", label: "Cotizaciones", icon: "📄", group: "TALLER", render: renderCotizaciones },
-  { path: "clientes", label: "Clientes", icon: "👤", group: "TALLER", render: renderClientes },
+  { path: "ordenes", label: "Trabajos", icon: "🏠", group: "NEGOCIO", render: renderOrdenes },
+  { path: "cotizaciones", label: "Cotizaciones", icon: "📄", group: "NEGOCIO", render: renderCotizaciones },
+  { path: "clientes", label: "Clientes", icon: "👤", group: "NEGOCIO", render: renderClientes },
   { path: "gastos", label: "Gastos", icon: "🧰", group: "DINERO", render: renderGastos },
   { path: "ajustes", label: "Ajustes", icon: "⚙️", group: "CONFIG", render: renderAjustes }
 ];
@@ -43,7 +44,7 @@ function buildNav() {
   // Barra inferior en teléfono: las 4 secciones de uso diario + "+".
   const tab = (p) => MODULES.find((m) => m.path === p);
   tabbar.innerHTML = ["dashboard", "ordenes"].map((p) => `<a href="#/${p}" data-path="${p}"><span>${tab(p).icon}</span>${tab(p).label}</a>`).join("")
-    + `<a href="#/ordenes/nueva" class="tab-plus" aria-label="Nueva orden"><span>＋</span></a>`
+    + `<a href="#/ordenes/nueva" class="tab-plus" aria-label="Nuevo trabajo"><span>＋</span></a>`
     + ["cotizaciones", "clientes"].map((p) => `<a href="#/${p}" data-path="${p}"><span>${tab(p).icon}</span>${p === "cotizaciones" ? "Cotizar" : tab(p).label}</a>`).join("");
 }
 
@@ -64,7 +65,7 @@ function renderRoute() {
   try {
     mod.render(content, currentUser, param);
   } catch (e) {
-    console.error(e);
+    reportarError(`pantalla ${mod.path}`, e);
     content.innerHTML = `<p class="error-text">Error al mostrar la sección: ${esc(e.message)}</p>`;
   }
   window.scrollTo(0, keepScroll);

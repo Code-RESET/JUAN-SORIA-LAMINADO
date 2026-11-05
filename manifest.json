@@ -1,7 +1,7 @@
 {
-  "name": "Juan Soria · Laminado y Pintura",
+  "name": "Juan Soria · Pisos y Decoración",
   "short_name": "Juan Soria",
-  "description": "Control de taller: órdenes, cotizaciones, clientes y gastos. Desarrollado por Code-Reset — Ing. Luis Ángel Díaz Bernal",
+  "description": "Pisos laminados, SPC, PVC, persianas y decoración: trabajos, cotizaciones, clientes y gastos. Desarrollado por Code-Reset — Ing. Luis Ángel Díaz Bernal",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

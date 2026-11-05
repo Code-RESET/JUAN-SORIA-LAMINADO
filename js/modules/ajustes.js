@@ -6,10 +6,11 @@
 // ============================================================
 
 import * as store from "../store.js";
-import { DEMO_MODE } from "../firebase-config.js";
+import { DEMO_MODE, ENTORNO } from "../firebase-config.js";
+import { reportarError, listarErrores, limpiarErrores, marcarVistos } from "../errores.js";
 import { esc, money, num, toast, openModal, closeModal, confirmar, descargar, hoyISO, $ } from "../ui.js";
-import { totales } from "../lineas.js";
-import { ESTADOS, vehiculoTxt } from "../documento.js";
+import { totales, lineaTxt } from "../lineas.js";
+import { ESTADOS, obraTxt, UNIDADES } from "../documento.js";
 
 export function renderAjustes(container) {
   const a = store.ajustes();
@@ -27,7 +28,7 @@ export function renderAjustes(container) {
           <label class="field"><span>IVA %</span><input class="input" name="ivaPct" type="number" value="${esc(a.ivaPct)}" /></label>
         </div>
         <label class="field"><span>Dirección</span><input class="input" name="direccion" value="${esc(a.direccion)}" /></label>
-        <label class="field"><span>Garantía (sale en la orden)</span><input class="input" name="garantia" value="${esc(a.garantia)}" /></label>
+        <label class="field"><span>Garantía (sale en el trabajo)</span><input class="input" name="garantia" value="${esc(a.garantia)}" /></label>
         <label class="field"><span>Condiciones (salen en la cotización)</span><input class="input" name="condiciones" value="${esc(a.condiciones)}" /></label>
         <label class="field"><span>Vigencia de cotización (días)</span><input class="input" name="vigenciaDias" type="number" value="${esc(a.vigenciaDias)}" /></label>
         <button class="btn btn-primary" type="submit">Guardar datos</button>
@@ -36,9 +37,9 @@ export function renderAjustes(container) {
 
     <div class="card">
       <div class="card-h-row"><h3 class="card-h">Catálogo de servicios</h3><button class="btn btn-ghost btn-sm" id="nuevo-serv">+ Agregar</button></div>
-      <p class="muted small">Al escribir un servicio en una orden o cotización, el precio se llena solo.</p>
+      <p class="muted small">Al escribir un producto en un trabajo o cotización, se llenan solos la unidad y el precio.</p>
       <div class="catalogo">
-        ${cat.map((s) => `<div class="row-card slim" data-id="${s.id}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)}</strong></div>`).join("") || `<p class="muted">Sin servicios.</p>`}
+        ${cat.map((s) => `<div class="row-card slim" data-id="${s.id}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong></div>`).join("") || `<p class="muted">Sin servicios.</p>`}
       </div>
     </div>
 
@@ -48,22 +49,30 @@ export function renderAjustes(container) {
       <div class="form-actions wrap">
         <button class="btn btn-ghost" id="btn-respaldo">📥 Descargar respaldo</button>
         <button class="btn btn-ghost" id="btn-restaurar">📤 Restaurar respaldo</button>
-        <button class="btn btn-ghost" id="btn-csv">📊 Exportar órdenes a Excel</button>
+        <button class="btn btn-ghost" id="btn-csv">📊 Exportar trabajos a Excel</button>
         <button class="btn btn-ghost" id="btn-instalar" hidden>📲 Instalar app</button>
       </div>
       <input type="file" id="file-restaurar" accept=".json,application/json" hidden />
     </div>
 
+    <div class="card" id="errores">
+      <div class="card-h-row"><h3 class="card-h">Errores registrados</h3>
+        <span class="muted small">Entorno: <b>${ENTORNO === "prueba" ? "PRUEBA" : "PRODUCCIÓN"}</b>${DEMO_MODE ? " · demo local" : " · Firebase"}</span></div>
+      ${erroresHTML()}
+    </div>
+
     ${DEMO_MODE ? `
     <div class="card">
       <h3 class="card-h">Datos de ejemplo</h3>
-      <p class="muted small">Carga clientes y órdenes ficticias para ver la app llena, o borra todo para empezar desde cero.</p>
+      <p class="muted small">Carga clientes y trabajos ficticios para ver la app llena, o borra todo para empezar desde cero.</p>
       <div class="form-actions wrap">
         <button class="btn btn-ghost" id="btn-ejemplo">✨ Cargar ejemplos</button>
         <button class="btn btn-danger" id="btn-borrar">Borrar todos los datos</button>
       </div>
     </div>` : ""}
   `;
+
+  bindErrores(container);
 
   $("#f-negocio", container).onsubmit = async (e) => {
     e.preventDefault();
@@ -91,6 +100,7 @@ export function renderAjustes(container) {
       await store.importarTodo(data);
       toast("Respaldo restaurado");
     } catch (err) {
+      reportarError("restaurar respaldo", err);
       alert("No se pudo restaurar: " + err.message);
     } finally { fileIn.value = ""; }
   };
@@ -114,13 +124,47 @@ export function renderAjustes(container) {
   }
 }
 
+// ---------- Panel de errores ----------
+function erroresHTML() {
+  const lista = listarErrores();
+  if (!lista.length) return `<p class="muted small">✅ Sin errores registrados.</p>`;
+  return `
+    <p class="muted small">Si algo falló sin avisar, aparece aquí. Mándale esta lista al desarrollador.</p>
+    <div class="err-list">
+      ${lista.slice(0, 20).map((e) => `
+        <details class="err-item ${e.visto ? "" : "nuevo"}">
+          <summary><b>${esc(e.contexto)}</b> · ${esc(e.mensaje)}<span class="muted small"> · ${esc(new Date(e.fecha).toLocaleString("es-MX"))}</span></summary>
+          <pre>${esc([e.codigo && "código: " + e.codigo, "ruta: " + e.ruta, e.stack].filter(Boolean).join("\n"))}</pre>
+        </details>`).join("")}
+    </div>
+    <div class="form-actions wrap">
+      <button class="btn btn-ghost btn-sm" id="err-copiar">📋 Copiar</button>
+      <button class="btn btn-ghost btn-sm" id="err-descargar">📥 Descargar</button>
+      <button class="btn btn-danger btn-sm" id="err-limpiar">Limpiar</button>
+    </div>`;
+}
+
+function bindErrores(container) {
+  marcarVistos();
+  const texto = () => JSON.stringify(listarErrores(), null, 2);
+  const c = $("#err-copiar", container);
+  if (!c) return;
+  c.onclick = async () => {
+    try { await navigator.clipboard.writeText(texto()); toast("Errores copiados"); }
+    catch { descargar(`errores-${hoyISO()}.json`, texto()); }
+  };
+  $("#err-descargar", container).onclick = () => descargar(`errores-${hoyISO()}.json`, texto());
+  $("#err-limpiar", container).onclick = () => { limpiarErrores(); renderAjustes(container); };
+}
+
 function formServicio(s = {}) {
   const body = openModal(s.id ? "Editar servicio" : "Nuevo servicio", `
     <form id="f-serv" class="form">
       <label class="field"><span>Nombre *</span><input class="input" name="nombre" required value="${esc(s.nombre || "")}" /></label>
-      <div class="cols-2">
+      <div class="cols-3">
+        <label class="field"><span>Unidad</span><select class="input" name="unidad">${Object.entries(UNIDADES).map(([k, v]) => `<option value="${k}" ${(s.unidad || "m2") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <label class="field"><span>Precio al cliente</span><input class="input" name="precio" type="number" inputmode="decimal" step="0.01" value="${esc(s.precio ?? "")}" /></label>
-        <label class="field"><span>Costo de material</span><input class="input" name="costo" type="number" inputmode="decimal" step="0.01" value="${esc(s.costo ?? "")}" /></label>
+        <label class="field"><span>Costo unitario</span><input class="input" name="costo" type="number" inputmode="decimal" step="0.01" value="${esc(s.costo ?? "")}" /></label>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary grow" type="submit">Guardar</button>
@@ -130,7 +174,7 @@ function formServicio(s = {}) {
   $("#f-serv", body).onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("servicios", { ...s, nombre: f.nombre.trim(), precio: num(f.precio), costo: num(f.costo) });
+    await store.save("servicios", { ...s, nombre: f.nombre.trim(), unidad: f.unidad, precio: num(f.precio), costo: num(f.costo) });
     closeModal();
   };
   const del = $("[data-del]", body);
@@ -138,42 +182,50 @@ function formServicio(s = {}) {
 }
 
 function exportarCSV() {
-  const rows = [["Folio", "Fecha ingreso", "Cliente", "Teléfono", "Vehículo", "Placas", "Servicios", "Estado", "Total", "Pagado", "Saldo", "Costo materiales"]];
+  const rows = [["Folio", "Fecha alta", "Cliente", "Teléfono", "Obra", "m²", "Conceptos", "Estado", "Fecha instalación", "Total", "Pagado", "Saldo", "Costo material"]];
   store.all("ordenes").sort((a, b) => a.folio - b.folio).forEach((o) => {
     const t = totales(o);
-    rows.push([o.folio, o.fechaIngreso, o.clienteNombre, o.telefono, vehiculoTxt({ ...o.vehiculo, placas: "" }), o.vehiculo?.placas || "",
-      (o.servicios || []).map((s) => s.descripcion).join(" | "), ESTADOS[o.estado], t.total.toFixed(2), t.pagado.toFixed(2), t.saldo.toFixed(2), t.costo.toFixed(2)]);
+    rows.push([o.folio, o.fechaIngreso, o.clienteNombre, o.telefono, obraTxt(o.obra), o.obra?.m2 || "",
+      (o.servicios || []).map((s) => `${s.descripcion} (${lineaTxt(s)})`).join(" | "), ESTADOS[o.estado], o.fechaInstalacion || "",
+      t.total.toFixed(2), t.pagado.toFixed(2), t.saldo.toFixed(2), t.costo.toFixed(2)]);
   });
   const csv = rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
   // BOM para que Excel respete acentos.
-  descargar(`ordenes-${hoyISO()}.csv`, "﻿" + csv, "text/csv;charset=utf-8");
+  descargar(`trabajos-${hoyISO()}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
 }
 
+// DATOS FICTICIOS: nombres inventados y teléfonos 871-000-00xx que no
+// existen. Nunca poner aquí (ni en el repo) datos de clientes reales.
 async function cargarEjemplos() {
   const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+  const L = (descripcion, cantidad, unidad, precio, costo) => ({ descripcion, cantidad, unidad, precio, costo });
   const ej = [
-    ["María López", "8711234567", { marca: "Nissan", modelo: "Versa", anio: "2019", color: "Blanco", placas: "FRT-123" }, [["Laminado de puerta", 1, 1800, 300], ["Pintura por pieza", 1, 1800, 600]], "EN_PROCESO", -3, 2, [1800]],
-    ["Carlos Ramírez", "8719876543", { marca: "Chevrolet", modelo: "Aveo", anio: "2017", color: "Gris", placas: "GHK-908" }, [["Laminado de defensa", 1, 1500, 250], ["Pulido y encerado", 1, 900, 150]], "LISTO", -6, 0, [1000]],
-    ["Transportes del Norte", "8715550000", { marca: "Ford", modelo: "Ranger", anio: "2021", color: "Rojo", placas: "TN-4521" }, [["Laminado de salpicadera", 2, 1600, 250], ["Pintura por pieza", 2, 1800, 600]], "RECIBIDO", -1, 6, []],
-    ["Ana Torres", "8712223344", { marca: "Volkswagen", modelo: "Jetta", anio: "2015", color: "Negro", placas: "LMN-332" }, [["Reparación de rayón", 1, 700, 120]], "ENTREGADO", -12, -9, [700]]
+    ["Cliente Ejemplo Uno", "8710000001", { direccion: "Calle Ficticia 101", colonia: "Col. Demo", espacio: "Sala y comedor", m2: 38 },
+      [L("Piso laminado 12 mm", 42, "m2", 420, 290), L("Bajo piso / espuma", 42, "m2", 35, 18), L("Instalación de piso", 38, "m2", 120, 0), L("Zoclo PVC", 26, "ml", 95, 45)], "INSTALACION", -6, 0, [12000]],
+    ["Cliente Ejemplo Dos", "8710000002", { direccion: "Av. Prueba 202", colonia: "Fracc. Ejemplo", espacio: "Recámara principal", m2: 6.5 },
+      [L("Persiana enrollable blackout", 6.5, "m2", 950, 520), L("Instalación de persiana", 3, "pza", 250, 0)], "MATERIAL", -3, 4, [3500]],
+    ["Oficinas Demo S.A.", "8710000003", { direccion: "Blvd. Imaginario 303", colonia: "Zona Centro", espacio: "Oficina y recepción", m2: 60 },
+      [L("Piso SPC 5 mm (click)", 66, "m2", 480, 330), L("Instalación de piso", 60, "m2", 120, 0)], "MEDICION", -1, 9, []],
+    ["Cliente Ejemplo Cuatro", "8710000004", { direccion: "Privada Muestra 404", colonia: "Col. Demo", espacio: "Muro de TV", m2: "" },
+      [L("Panel decorativo WPC / ranurado", 6, "pza", 650, 380)], "TERMINADO", -12, -8, [3900]]
   ];
   let folio = store.siguienteFolio("ordenes");
-  for (const [nombre, tel, vehiculo, lineas, estado, ingreso, entrega, pagos] of ej) {
+  for (const [nombre, tel, obra, servicios, estado, alta, inst, pagos] of ej) {
     const c = await store.save("clientes", { nombre, telefono: tel });
     await store.save("ordenes", {
-      folio: folio++, clienteId: c.id, clienteNombre: nombre, telefono: tel, tipo: "PARTICULAR", vehiculo,
-      servicios: lineas.map(([descripcion, cantidad, precio, costo]) => ({ descripcion, cantidad, precio, costo })),
-      descuento: 0, conIva: false, ivaPct: 16, estado, fechaIngreso: d(ingreso), fechaEntrega: d(entrega),
-      pagos: pagos.map((monto) => ({ monto, metodo: "Efectivo", fecha: d(ingreso) })), notas: "", garantia: store.ajustes().garantia
+      folio: folio++, clienteId: c.id, clienteNombre: nombre, telefono: tel, obra, servicios,
+      descuento: 0, conIva: false, ivaPct: 16, estado, fechaIngreso: d(alta), fechaInstalacion: d(inst),
+      pagos: pagos.map((monto) => ({ monto, metodo: "Transferencia", fecha: d(alta), nota: "Anticipo" })), notas: "", garantia: store.ajustes().garantia
     });
   }
   await store.save("cotizaciones", {
-    folio: store.siguienteFolio("cotizaciones"), fecha: d(-2), estado: "ABIERTA", clienteNombre: "Luis Hernández", telefono: "8713334455",
-    vehiculo: { marca: "Toyota", modelo: "Corolla", anio: "2020", color: "Plata", placas: "" },
-    servicios: [{ descripcion: "Laminado de cofre", cantidad: 1, precio: 2200, costo: 350 }, { descripcion: "Pintura por pieza", cantidad: 1, precio: 1800, costo: 600 }],
-    descuento: 200, conIva: false, ivaPct: 16, vigenciaDias: 15, notas: ""
+    folio: store.siguienteFolio("cotizaciones"), fecha: d(-2), estado: "ABIERTA", clienteNombre: "Cliente Ejemplo Cinco", telefono: "8710000005",
+    obra: { direccion: "Calle Ficticia 505", colonia: "Col. Demo", espacio: "Toda la casa (planta baja)", m2: 72 },
+    servicios: [L("Piso vinílico PVC autoadherible", 79, "m2", 260, 160), L("Instalación de piso", 72, "m2", 120, 0)],
+    descuento: 500, conIva: false, ivaPct: 16, vigenciaDias: 15, notas: "Incluye retiro de muebles ligeros."
   });
-  await store.save("gastos", { concepto: "Galón de primer y lijas", monto: 1350, fecha: d(-4), categoria: "Pintura y materiales" });
-  await store.save("gastos", { concepto: "Renta del taller", monto: 6000, fecha: d(0), categoria: "Renta" });
+  await store.save("gastos", { concepto: "Pegamento, cortadora y discos", monto: 1350, fecha: d(-4), categoria: "Herramienta" });
+  await store.save("gastos", { concepto: "Flete de material", monto: 800, fecha: d(-2), categoria: "Fletes / gasolina" });
+  await store.save("gastos", { concepto: "Renta de bodega", monto: 4500, fecha: d(0), categoria: "Renta" });
   toast("Ejemplos cargados");
 }

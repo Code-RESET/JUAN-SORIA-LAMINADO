@@ -7,13 +7,14 @@
 // No mezclar lógica de negocio aquí: solo autenticación.
 // ============================================================
 
-import { DEMO_MODE, getFirebase } from "./firebase-config.js";
+import { DEMO_MODE, ENTORNO, getFirebase } from "./firebase-config.js";
+import { reportarError } from "./errores.js";
 import { initRouter } from "./router.js";
 import { initStore, stopStore } from "./store.js";
 import { initDocumento } from "./documento.js";
 import { closeModal } from "./ui.js";
 
-const DEMO_USER = { email: "demo@juansoria.mx", password: "demo2026" };
+const DEMO_USER = { email: "demo@example.com", password: "demo2026" };
 const SESSION_KEY = "jsl_demo_session";
 
 const loginScreen = document.getElementById("login-screen");
@@ -34,6 +35,8 @@ async function entrar(user) {
   document.getElementById("loading").hidden = false;
   try {
     await initStore(user);
+  } catch (e) {
+    reportarError("cargar datos", e);
   } finally {
     document.getElementById("loading").hidden = true;
   }
@@ -48,6 +51,7 @@ function salir() {
 }
 
 initDocumento();
+document.getElementById("env-banner").hidden = ENTORNO !== "prueba";
 
 // Menú lateral en teléfono
 document.getElementById("menu-btn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
@@ -93,6 +97,7 @@ if (DEMO_MODE) {
       await signInWithEmailAndPassword(fb.auth, emailIn.value.trim(), passIn.value);
     } catch (err) {
       showError(traducirErrorFirebase(err.code));
+      if (!["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"].includes(err.code)) reportarError("login", err);
     } finally {
       loginBtn.disabled = false;
       loginBtn.textContent = "Entrar";

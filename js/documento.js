@@ -11,12 +11,16 @@ import { esc, money, fecha, waLink } from "./ui.js";
 import { totales } from "./lineas.js";
 import * as store from "./store.js";
 
+// Flujo de un trabajo de pisos / persianas.
 const ESTADOS = {
-  RECIBIDO: "Recibido", EN_PROCESO: "En proceso", LISTO: "Listo para entregar", ENTREGADO: "Entregado"
+  MEDICION: "Medición", MATERIAL: "Pedido de material", INSTALACION: "En instalación", TERMINADO: "Terminado"
 };
 
-function vehiculoTxt(v = {}) {
-  return [v.marca, v.modelo, v.anio, v.color].filter(Boolean).join(" ") + (v.placas ? ` · Placas ${v.placas}` : "");
+export const UNIDADES = { m2: "m²", ml: "ml", pza: "pza", caja: "caja", serv: "serv." };
+
+// Texto corto de la obra: "Sala y comedor · Calle 5 #120, Col. Centro"
+function obraTxt(o = {}) {
+  return [o.espacio, [o.direccion, o.colonia].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
 }
 
 export function abrirDocumento(tipo, doc) {
@@ -27,7 +31,7 @@ export function abrirDocumento(tipo, doc) {
   const folio = String(doc.folio || "").padStart(4, "0");
 
   const filas = (doc.servicios || []).map((l) => `
-    <tr><td>${esc(l.descripcion)}</td><td class="c">${esc(l.cantidad || 1)}</td>
+    <tr><td>${esc(l.descripcion)}</td><td class="c">${esc(l.cantidad || 1)} ${UNIDADES[l.unidad] || ""}</td>
     <td class="r">${money(l.precio)}</td><td class="r">${money((l.cantidad || 1) * l.precio)}</td></tr>`).join("");
 
   const pagos = esOrden && (doc.pagos || []).length ? `
@@ -45,8 +49,8 @@ export function abrirDocumento(tipo, doc) {
     </div>
     <div class="doc-grid">
       <div><span>Cliente</span><strong>${esc(doc.clienteNombre || "—")}</strong>${doc.telefono ? `<div>${esc(doc.telefono)}</div>` : ""}</div>
-      <div><span>Vehículo</span><strong>${esc(vehiculoTxt(doc.vehiculo) || "—")}</strong></div>
-      ${esOrden ? `<div><span>Estado</span><strong>${ESTADOS[doc.estado] || ""}</strong>${doc.fechaEntrega ? `<div>Entrega estimada: ${fecha(doc.fechaEntrega)}</div>` : ""}</div>`
+      <div><span>Obra / dirección</span><strong>${esc(obraTxt(doc.obra) || "—")}</strong>${doc.obra?.m2 ? `<div>Superficie: ${esc(doc.obra.m2)} m²</div>` : ""}</div>
+      ${esOrden ? `<div><span>Estado</span><strong>${ESTADOS[doc.estado] || ""}</strong>${doc.fechaInstalacion ? `<div>Instalación: ${fecha(doc.fechaInstalacion)}</div>` : ""}</div>`
                 : `<div><span>Vigencia</span><strong>${esc(doc.vigenciaDias || a.vigenciaDias)} días</strong></div>`}
     </div>
     <table>
@@ -72,8 +76,8 @@ export function abrirDocumento(tipo, doc) {
   ov.querySelector(".doc-topbar-title").textContent = `${esOrden ? "Orden" : "Cotización"} #${folio}`;
 
   const resumen = `${a.negocio}\n${esOrden ? "Orden de trabajo" : "Cotización"} #${folio}\n` +
-    `Vehículo: ${vehiculoTxt(doc.vehiculo)}\n` +
-    (doc.servicios || []).map((l) => `• ${l.descripcion}${l.cantidad > 1 ? " x" + l.cantidad : ""}: ${money(l.cantidad * l.precio)}`).join("\n") +
+    (obraTxt(doc.obra) ? `Obra: ${obraTxt(doc.obra)}\n` : "") +
+    (doc.servicios || []).map((l) => `• ${l.descripcion} (${l.cantidad} ${UNIDADES[l.unidad] || ""}): ${money(l.cantidad * l.precio)}`).join("\n") +
     `\nTotal: ${money(t.total)}` + (esOrden ? `\nPagado: ${money(t.pagado)}\nSaldo: ${money(t.saldo)}` : `\nVigencia: ${doc.vigenciaDias || a.vigenciaDias} días`);
   const wa = ov.querySelector("[data-doc-wa]");
   wa.href = waLink(doc.telefono, resumen);
@@ -92,4 +96,4 @@ export function initDocumento() {
   });
 }
 
-export { ESTADOS, vehiculoTxt };
+export { ESTADOS, obraTxt };

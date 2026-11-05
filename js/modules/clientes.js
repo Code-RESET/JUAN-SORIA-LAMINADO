@@ -8,7 +8,7 @@
 import * as store from "../store.js";
 import { esc, money, fecha, toast, openModal, closeModal, confirmar, emptyState, waLink, $ } from "../ui.js";
 import { totales } from "../lineas.js";
-import { ESTADOS, vehiculoTxt } from "../documento.js";
+import { ESTADOS, obraTxt } from "../documento.js";
 
 let filtro = "";
 
@@ -92,8 +92,8 @@ function detalleCliente(id) {
     ${ords.length ? ords.map((o) => `
       <div class="card row-card" data-orden="${o.id}">
         <div class="grow">
-          <div class="card-title">#${String(o.folio).padStart(4, "0")} · ${esc(vehiculoTxt(o.vehiculo))}</div>
-          <div class="muted small">${fecha(o.fechaIngreso)} · ${ESTADOS[o.estado] || ""}</div>
+          <div class="card-title">#${String(o.folio).padStart(4, "0")} · ${esc((o.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
+          <div class="muted small">${fecha(o.fechaIngreso)} · ${ESTADOS[o.estado] || ""}${obraTxt(o.obra) ? " · " + esc(obraTxt(o.obra)) : ""}</div>
         </div>
         <strong>${money(totales(o).total)}</strong>
       </div>`).join("") : `<p class="muted">Sin trabajos registrados.</p>`}

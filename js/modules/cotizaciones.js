@@ -3,15 +3,15 @@
 // Cotizaciones guardadas (en la app de alarmas solo se generaban
 // y se perdían): folio, vigencia, estado Abierta / Aceptada /
 // Rechazada, envío por WhatsApp, PDF y botón "Convertir en orden"
-// que pasa cliente, vehículo y servicios sin volver a capturar.
+// que pasa cliente, obra y conceptos sin volver a capturar.
 // ============================================================
 
 import * as store from "../store.js";
 import { esc, money, num, fecha, hoyISO, toast, openModal, closeModal, confirmar, emptyState, $, $$ } from "../ui.js";
-import { lineasEditorHTML, bindLineas, leerLineas, totales, resumenHTML } from "../lineas.js";
-import { abrirDocumento, vehiculoTxt } from "../documento.js";
+import { lineasEditorHTML, bindLineas, leerLineas, totales, resumenHTML, lineaTxt } from "../lineas.js";
+import { abrirDocumento, obraTxt } from "../documento.js";
 import { asegurarCliente } from "./clientes.js";
-import { formOrden, detalleOrden } from "./ordenes.js";
+import { formOrden, detalleOrden, obraFieldsHTML, leerObra } from "./ordenes.js";
 
 const EST = { ABIERTA: "Abierta", ACEPTADA: "Aceptada", RECHAZADA: "Rechazada" };
 let filtro = "ABIERTA";
@@ -60,8 +60,9 @@ function pintar(container) {
     <div class="card orden-card" data-id="${c.id}">
       <div class="orden-top"><span class="folio">COT #${String(c.folio).padStart(4, "0")}</span>
         <span class="estado c-${c.estado}">${vencida(c) ? "Vencida" : EST[c.estado]}</span></div>
-      <div class="card-title">${esc(vehiculoTxt(c.vehiculo) || "Vehículo")}</div>
-      <div class="muted small">${esc(c.clienteNombre || "")} · ${fecha(c.fecha)}</div>
+      <div class="card-title">${esc(c.clienteNombre || "")}</div>
+      <div class="small">${esc((c.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
+      <div class="muted small">${esc(obraTxt(c.obra) || "")}${obraTxt(c.obra) ? " · " : ""}${fecha(c.fecha)}</div>
       <div class="orden-bottom"><strong>${money(totales(c).total)}</strong></div>
     </div>`).join("")}</div>` : emptyState("📄", "No hay cotizaciones en este filtro.");
   el.querySelectorAll("[data-id]").forEach((n) => (n.onclick = () => detalleCot(n.dataset.id)));
@@ -72,17 +73,18 @@ function detalleCot(id) {
   if (!c) return;
   const t = totales(c);
   const body = openModal(`Cotización #${String(c.folio).padStart(4, "0")}`, `
-    <div class="card-title">${esc(vehiculoTxt(c.vehiculo))}</div>
-    <div class="muted small">${esc(c.clienteNombre)}${c.telefono ? " · " + esc(c.telefono) : ""} · ${fecha(c.fecha)} · Vigencia ${esc(c.vigenciaDias)} días ${vencida(c) ? '<span class="pill bad">Vencida</span>' : ""}</div>
+    <div class="card-title">${esc(c.clienteNombre)}</div>
+    ${obraTxt(c.obra) ? `<div class="obra-box">📍 ${esc(obraTxt(c.obra))}${c.obra.m2 ? ` · ${esc(c.obra.m2)} m²` : ""}</div>` : ""}
+    <div class="muted small">${c.telefono ? " · " + esc(c.telefono) : ""} · ${fecha(c.fecha)} · Vigencia ${esc(c.vigenciaDias)} días ${vencida(c) ? '<span class="pill bad">Vencida</span>' : ""}</div>
     <h4 class="section-label">Conceptos</h4>
     <div class="tabla-lineas">
-      ${(c.servicios || []).map((l) => `<div><span>${esc(l.descripcion)}${l.cantidad > 1 ? ` <em>x${l.cantidad}</em>` : ""}</span><span>${money(l.cantidad * l.precio)}</span></div>`).join("")}
+      ${(c.servicios || []).map((l) => `<div><span>${esc(l.descripcion)} <em>${esc(lineaTxt(l))}</em></span><span>${money(l.cantidad * l.precio)}</span></div>`).join("")}
     </div>
     ${resumenHTML(t)}
     ${c.notas ? `<p class="muted">${esc(c.notas)}</p>` : ""}
     <div class="form-actions wrap">
-      ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver orden</button>`
-        : `<button class="btn btn-primary" data-act="convertir">✅ Convertir en orden</button>`}
+      ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver trabajo</button>`
+        : `<button class="btn btn-primary" data-act="convertir">✅ Convertir en trabajo</button>`}
       <button class="btn btn-ghost" data-act="doc">🖨️ PDF / WhatsApp</button>
       <button class="btn btn-ghost" data-act="edit">✏️ Editar</button>
       ${c.estado === "ABIERTA" ? `<button class="btn btn-ghost" data-act="rechazar">Rechazada</button>` : ""}
@@ -94,7 +96,7 @@ function detalleCot(id) {
   act("edit").onclick = () => formCotizacion(c);
   if (act("ver-orden")) act("ver-orden").onclick = () => detalleOrden(c.ordenId);
   if (act("convertir")) act("convertir").onclick = () => formOrden({
-    clienteNombre: c.clienteNombre, telefono: c.telefono, vehiculo: c.vehiculo,
+    clienteNombre: c.clienteNombre, telefono: c.telefono, obra: c.obra,
     servicios: c.servicios, descuento: c.descuento, conIva: c.conIva, notas: c.notas, cotizacionId: c.id
   });
   if (act("rechazar")) act("rechazar").onclick = async () => {
@@ -111,7 +113,6 @@ function detalleCot(id) {
 
 function formCotizacion(c = {}) {
   const a = store.ajustes();
-  const v = c.vehiculo || {};
   const clientes = store.all("clientes");
   const editando = !!c.id;
 
@@ -122,15 +123,7 @@ function formCotizacion(c = {}) {
         <label class="field"><span>Cliente *</span><input class="input" name="clienteNombre" list="dl-clientes-c" required value="${esc(c.clienteNombre || "")}" /></label>
         <label class="field"><span>Teléfono (WhatsApp)</span><input class="input" name="telefono" type="tel" inputmode="tel" value="${esc(c.telefono || "")}" /></label>
       </div>
-      <div class="cols-3">
-        <label class="field"><span>Marca</span><input class="input" name="marca" value="${esc(v.marca || "")}" /></label>
-        <label class="field"><span>Modelo</span><input class="input" name="modelo" value="${esc(v.modelo || "")}" /></label>
-        <label class="field"><span>Año</span><input class="input" name="anio" inputmode="numeric" value="${esc(v.anio || "")}" /></label>
-      </div>
-      <div class="cols-2">
-        <label class="field"><span>Color</span><input class="input" name="color" value="${esc(v.color || "")}" /></label>
-        <label class="field"><span>Placas</span><input class="input" name="placas" value="${esc(v.placas || "")}" /></label>
-      </div>
+      ${obraFieldsHTML(c.obra)}
       <div class="form-section">Conceptos</div>
       ${lineasEditorHTML(c.servicios)}
       <div class="cols-3">
@@ -172,7 +165,7 @@ function formCotizacion(c = {}) {
       clienteId: cli?.id || "",
       clienteNombre: f.clienteNombre.trim(),
       telefono: f.telefono.trim(),
-      vehiculo: { marca: f.marca.trim(), modelo: f.modelo.trim(), anio: f.anio.trim(), color: f.color.trim(), placas: f.placas.trim().toUpperCase() },
+      obra: leerObra(f),
       servicios,
       descuento: num(f.descuento),
       conIva: !!f.conIva,

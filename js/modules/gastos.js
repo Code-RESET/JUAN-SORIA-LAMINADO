@@ -1,14 +1,14 @@
 // ============================================================
 // modules/gastos.js
-// Gastos generales del taller (pintura, lijas, herramienta,
-// renta, sueldos...) que no van ligados a una orden. Se ven por
+// Gastos generales del negocio (herramienta, fletes, renta,
+// instaladores...) que no van ligados a un trabajo. Se ven por
 // mes y por categoría; alimentan la "utilidad neta" del Inicio.
 // ============================================================
 
 import * as store from "../store.js";
 import { esc, money, num, fecha, hoyISO, mesClave, toast, openModal, closeModal, confirmar, emptyState, $ } from "../ui.js";
 
-export const CATEGORIAS = ["Pintura y materiales", "Herramienta", "Refacciones", "Renta", "Luz / agua / internet", "Sueldos", "Otros"];
+export const CATEGORIAS = ["Material", "Herramienta", "Fletes / gasolina", "Instaladores / sueldos", "Renta", "Publicidad", "Luz / agua / internet", "Otros"];
 let mes = mesClave(hoyISO());
 
 export function renderGastos(container) {
@@ -56,7 +56,7 @@ function pintar(container) {
 function formGasto(g = {}) {
   const body = openModal(g.id ? "Editar gasto" : "Nuevo gasto", `
     <form id="f-gasto" class="form">
-      <label class="field"><span>Concepto *</span><input class="input" name="concepto" required placeholder="Ej. Galón de primer, lijas" value="${esc(g.concepto || "")}" /></label>
+      <label class="field"><span>Concepto *</span><input class="input" name="concepto" required placeholder="Ej. Pegamento, discos de corte" value="${esc(g.concepto || "")}" /></label>
       <div class="cols-3">
         <label class="field"><span>Monto *</span><input class="input" name="monto" type="number" inputmode="decimal" step="0.01" required value="${esc(g.monto ?? "")}" /></label>
         <label class="field"><span>Fecha</span><input class="input" name="fecha" type="date" value="${esc(g.fecha || hoyISO())}" /></label>

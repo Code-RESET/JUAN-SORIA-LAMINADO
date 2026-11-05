@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Juan Soria · Taller</title>
+<title>Juan Soria · Pisos y Decoración</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -26,7 +26,7 @@
   <div class="login-card">
     <img src="assets/logo.svg" alt="Code-Reset" class="login-logo" />
     <h1 class="login-title">JUAN SORIA</h1>
-    <p class="login-subtitle">Laminado y Pintura · Control de taller</p>
+    <p class="login-subtitle">Pisos laminados · Persianas · Decoración</p>
 
     <form id="login-form" autocomplete="on">
       <label class="field">
@@ -50,11 +50,13 @@
 </section>
 
 <!-- ===================== APP ===================== -->
+<div id="env-banner" class="env-banner" hidden>ENTORNO DE PRUEBA · datos ficticios</div>
+
 <section id="app-shell" class="screen" hidden>
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="brand-name">JUAN SORIA</div>
-      <div class="brand-sub">Laminado y Pintura</div>
+      <div class="brand-sub">Pisos y Decoración</div>
     </div>
     <nav id="app-nav" class="app-nav"></nav>
     <div class="sidebar-foot">
@@ -69,6 +71,7 @@
     <button id="menu-btn" class="icon-btn menu-btn" aria-label="Menú">☰</button>
     <div class="brand-name">JUAN SORIA</div>
     <span id="net-badge" class="net-badge" hidden>Sin conexión</span>
+    <a id="err-badge" class="err-badge" href="#/ajustes" title="Errores registrados — ver en Ajustes" hidden>⚠ 0</a>
   </header>
 
   <main id="app-content" class="app-content"></main>
@@ -111,6 +114,7 @@
 
 <div id="toast" class="toast"></div>
 
+<script type="module" src="js/errores.js"></script>
 <script type="module" src="js/auth.js"></script>
 <script>
   // Aviso de conexión

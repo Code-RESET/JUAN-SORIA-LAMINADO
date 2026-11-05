@@ -13,6 +13,7 @@
 // ============================================================
 
 import { DEMO_MODE, getFirebase } from "./firebase-config.js";
+import { reportarError } from "./errores.js";
 
 export const COLLECTIONS = ["clientes", "ordenes", "cotizaciones", "gastos", "servicios", "ajustes"];
 const LS_PREFIX = "jsl_";
@@ -22,13 +23,14 @@ const listeners = new Set();
 let fb = null;
 let uid = null;
 let unsubs = [];
+let cargaFallida = false;
 
 export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 function emit(col) {
-  listeners.forEach((fn) => { try { fn(col); } catch (e) { console.error(e); } });
+  listeners.forEach((fn) => { try { fn(col); } catch (e) { reportarError("vista", e); } });
 }
 
 export function onChange(fn) {
@@ -36,16 +38,19 @@ export function onChange(fn) {
   return () => listeners.delete(fn);
 }
 
+// Datos separados POR USUARIO también en modo demo: jsl_<uid>_<col>
+const lsKey = (col) => `${LS_PREFIX}${uid}_${col}`;
+
 function lsRead(col) {
-  try { return JSON.parse(localStorage.getItem(LS_PREFIX + col) || "[]"); }
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem(lsKey(col)) || "[]"); }
+  catch (e) { reportarError("leer " + col, e); return []; }
 }
 
 function lsWrite(col) {
   try {
-    localStorage.setItem(LS_PREFIX + col, JSON.stringify(cache[col]));
+    localStorage.setItem(lsKey(col), JSON.stringify(cache[col]));
   } catch (e) {
-    console.error(e);
+    reportarError("guardar " + col, e);
     alert("No se pudo guardar en el dispositivo (almacenamiento lleno). Haz un respaldo JSON desde Ajustes.");
   }
 }
@@ -53,6 +58,8 @@ function lsWrite(col) {
 export async function initStore(user) {
   stopStore();
   COLLECTIONS.forEach((c) => (cache[c] = []));
+  uid = user.uid;
+  cargaFallida = false;
 
   if (DEMO_MODE) {
     COLLECTIONS.forEach((c) => (cache[c] = lsRead(c)));
@@ -61,7 +68,6 @@ export async function initStore(user) {
   }
 
   fb = await getFirebase();
-  uid = user.uid;
   const { collection, onSnapshot } = fb.fsMod;
   // Primera carga: esperamos a que cada colección responda una vez
   // (desde la cache offline si no hay red) antes de pintar la app.
@@ -71,7 +77,9 @@ export async function initStore(user) {
       cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
       if (first) { first = false; resolve(); } else emit(col);
     }, (err) => {
-      console.error(col, err);
+      // Antes este error solo iba a la consola y la app se veía "vacía".
+      cargaFallida = true;
+      reportarError(`leer ${col} (Firestore)`, err);
       if (first) { first = false; resolve(); }
     });
     unsubs.push(unsub);
@@ -109,10 +117,7 @@ export async function save(col, obj) {
     const { id, ...data } = item;
     // Sin await del servidor: con la cache offline la escritura queda
     // en cola y se sube sola al volver la señal.
-    setDoc(doc(fb.db, "usuarios", uid, col, id), data).catch((e) => {
-      console.error(e);
-      alert("Error al guardar en la nube: " + e.message);
-    });
+    setDoc(doc(fb.db, "usuarios", uid, col, id), data).catch((e) => reportarError(`guardar ${col}`, e));
   }
   emit(col);
   return item;
@@ -124,7 +129,7 @@ export async function remove(col, id) {
     lsWrite(col);
   } else {
     const { doc, deleteDoc } = fb.fsMod;
-    deleteDoc(doc(fb.db, "usuarios", uid, col, id)).catch((e) => console.error(e));
+    deleteDoc(doc(fb.db, "usuarios", uid, col, id)).catch((e) => reportarError(`eliminar ${col}`, e));
   }
   emit(col);
 }
@@ -132,12 +137,12 @@ export async function remove(col, id) {
 // ---------- Ajustes del negocio (un solo documento) ----------
 const DEFAULT_AJUSTES = {
   id: "config",
-  negocio: "Juan Soria · Laminado y Pintura",
+  negocio: "Juan Soria · Pisos y Decoración",
   telefono: "",
   direccion: "",
   ivaPct: 16,
-  garantia: "Garantía de 6 meses en mano de obra y pintura.",
-  condiciones: "50% de anticipo para iniciar el trabajo, resto contra entrega.",
+  garantia: "Garantía de 1 año en mano de obra de instalación. El material cuenta con la garantía del fabricante.",
+  condiciones: "50% de anticipo para pedir el material, resto al terminar la instalación. Medidas sujetas a verificación en obra.",
   vigenciaDias: 15
 };
 
@@ -169,19 +174,26 @@ export async function importarTodo(data) {
 
 // ---------- Catálogo inicial (solo la primera vez) ----------
 function seedIfEmpty() {
-  if (all("servicios").length || localStorage.getItem(LS_PREFIX + "seeded")) return;
+  // Si la carga falló (ej. permisos) NO sembramos: escribiría encima de datos que no pudimos leer.
+  if (cargaFallida || all("servicios").length || localStorage.getItem(lsKey("seeded_pisos"))) return;
+  // Precios de ejemplo (por unidad); Juan los ajusta en Ajustes → Catálogo.
   const base = [
-    ["Laminado de puerta", 1800, 300],
-    ["Laminado de cofre", 2200, 350],
-    ["Laminado de defensa", 1500, 250],
-    ["Laminado de salpicadera", 1600, 250],
-    ["Pintura por pieza", 1800, 600],
-    ["Pintura completa", 18000, 6000],
-    ["Pulido y encerado", 900, 150],
-    ["Reparación de rayón", 700, 120],
-    ["Desabollado sin pintura (PDR)", 800, 0],
-    ["Cambio de pieza (mano de obra)", 600, 0]
+    ["Piso laminado 8 mm", "m2", 320, 210],
+    ["Piso laminado 12 mm", "m2", 420, 290],
+    ["Piso SPC 5 mm (click)", "m2", 480, 330],
+    ["Piso vinílico PVC autoadherible", "m2", 260, 160],
+    ["Bajo piso / espuma", "m2", 35, 18],
+    ["Instalación de piso", "m2", 120, 0],
+    ["Zoclo PVC", "ml", 95, 45],
+    ["Perfil de transición / remate", "pza", 180, 90],
+    ["Persiana enrollable blackout", "m2", 950, 520],
+    ["Persiana enrollable screen", "m2", 1050, 580],
+    ["Persiana sheer elegance", "m2", 1250, 700],
+    ["Instalación de persiana", "pza", 250, 0],
+    ["Panel decorativo WPC / ranurado", "pza", 650, 380],
+    ["Papel tapiz (incluye instalación)", "m2", 380, 190],
+    ["Retiro de piso existente", "m2", 60, 0]
   ];
-  base.forEach(([nombre, precio, costo]) => save("servicios", { nombre, precio, costo }));
-  try { localStorage.setItem(LS_PREFIX + "seeded", "1"); } catch {}
+  base.forEach(([nombre, unidad, precio, costo]) => save("servicios", { nombre, unidad, precio, costo }));
+  try { localStorage.setItem(lsKey("seeded_pisos"), "1"); } catch {}
 }

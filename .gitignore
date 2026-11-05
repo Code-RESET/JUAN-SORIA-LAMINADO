@@ -1,0 +1,8 @@
+node_modules/
+# Nunca subir respaldos ni exportaciones: pueden traer datos reales de clientes.
+respaldo-*.json
+trabajos-*.csv
+errores-*.json
+*.log
+.firebase/
+tests/capturas/
