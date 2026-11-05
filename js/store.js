@@ -23,7 +23,10 @@ const listeners = new Set();
 let fb = null;
 let uid = null;
 let unsubs = [];
-let cargaFallida = false;
+// Colecciones cuya lectura falló. Mientras haya alguna, no se
+// generan folios ni se siembra el catálogo (se quitan al reconectar).
+const fallidas = new Set();
+let cacheVaciaSinRed = false;
 
 export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -59,7 +62,8 @@ export async function initStore(user) {
   stopStore();
   COLLECTIONS.forEach((c) => (cache[c] = []));
   uid = user.uid;
-  cargaFallida = false;
+  fallidas.clear();
+  cacheVaciaSinRed = false;
 
   if (DEMO_MODE) {
     COLLECTIONS.forEach((c) => (cache[c] = lsRead(c)));
@@ -80,11 +84,16 @@ export async function initStore(user) {
     const suscribir = () => {
       const unsub = onSnapshot(collection(fb.db, "usuarios", uid, col), (snap) => {
         espera = 2000;
+        fallidas.delete(col);
+        // Dispositivo nuevo sin señal: la cache local llega vacía. No es
+        // "no hay datos", es "aún no sabemos": no sembrar ni numerar.
+        if (first && snap.metadata.fromCache && snap.empty && (col === "servicios" || col === "ajustes")) cacheVaciaSinRed = true;
+        if (!snap.metadata.fromCache) cacheVaciaSinRed = false;
         cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-        if (first) { first = false; resolve(); } else emit(col);
+        if (first) { first = false; resolve(); } else { emit(col); if (col === "servicios") seedIfEmpty(); }
       }, (err) => {
         // Antes este error solo iba a la consola y la app se veía "vacía".
-        if (first) cargaFallida = true;
+        fallidas.add(col);
         reportarError(`leer ${col} (Firestore)`, err);
         if (first) { first = false; resolve(); }
         if (err?.code !== "permission-denied") {
@@ -129,7 +138,8 @@ export async function save(col, obj, { conservarFecha = false } = {}) {
     const { id, ...data } = item;
     // Sin await del servidor: con la cache offline la escritura queda
     // en cola y se sube sola al volver la señal.
-    setDoc(doc(fb.db, "usuarios", uid, col, id), data).catch((e) => reportarError(`guardar ${col}`, e));
+    // ajustes se fusiona (merge) para que dos dispositivos no se pisen campos distintos.
+    setDoc(doc(fb.db, "usuarios", uid, col, id), data, col === "ajustes" ? { merge: true } : {}).catch((e) => reportarError(`guardar ${col}`, e));
   }
   emit(col);
   return item;
@@ -174,7 +184,7 @@ export function siguienteFolio(col) {
 }
 
 export async function reservarFolio(col) {
-  if (cargaFallida) throw new Error("No se pudieron leer los datos; no se generan folios para no repetirlos. Revisa la conexión.");
+  if (fallidas.size || cacheVaciaSinRed) throw new Error("No se pudieron leer los datos; no se generan folios para no repetirlos. Revisa la conexión.");
   const folio = siguienteFolio(col);
   const a = ajustes();
   await save("ajustes", { ...a, folios: { ...(a.folios || {}), [col]: folio } });
@@ -204,13 +214,42 @@ function limpiarImportado(col, item) {
   for (const k of ["fecha", "fechaIngreso", "fechaInstalacion", "fechaTerminado"]) {
     if (k in x && x[k] && !FECHA_RE.test(String(x[k]))) x[k] = "";
   }
-  if (Array.isArray(x.pagos)) x.pagos = x.pagos.map((p) => ({ ...p, fecha: FECHA_RE.test(String(p?.fecha)) ? p.fecha : "" }));
+  if (Array.isArray(x.pagos)) x.pagos = x.pagos.map((p) => ({ ...p, monto: Number(p?.monto) || 0, metodo: String(p?.metodo ?? ""), fecha: FECHA_RE.test(String(p?.fecha)) ? p.fecha : "" }));
+  else if ("pagos" in x) x.pagos = [];
+  if (Array.isArray(x.servicios)) x.servicios = x.servicios.map((l) => ({ ...l, descripcion: String(l?.descripcion ?? ""), cantidad: Number(l?.cantidad) || 1, precio: Number(l?.precio) || 0, costo: Number(l?.costo) || 0 }));
+  else if ("servicios" in x) x.servicios = [];
+  for (const k of ["ivaPct", "vigenciaDias", "monto", "precio", "costo", "descuento"]) if (k in x) x[k] = Number(x[k]) || 0;
+  for (const k of ["nombre", "clienteNombre", "telefono", "concepto", "categoria", "negocio"]) if (k in x) x[k] = String(x[k] ?? "");
+  if ((col === "clientes" || col === "servicios") && !x.nombre.trim()) return null;
+  if (col === "ajustes" && x.id !== "config") return null;
   return x;
 }
 
 export async function importarTodo(data) {
   const res = { nuevos: 0, actualizados: 0, omitidos: 0 };
+
+  // Ajustes: si aquí nunca se editaron (dispositivo nuevo), se toman los
+  // del respaldo aunque sean "más viejos". Los folios toman el MAYOR.
+  const ajR = limpiarImportado("ajustes", (data.ajustes || []).find((x) => x?.id === "config"));
+  if (ajR) {
+    const act = ajustes();
+    const folios = {};
+    for (const k of new Set([...Object.keys(act.folios || {}), ...Object.keys(ajR.folios || {})])) {
+      folios[k] = Math.max(Number(act.folios?.[k]) || 0, Number(ajR.folios?.[k]) || 0);
+    }
+    const base = !act.editado || (Number(ajR.actualizado) || 0) > (Number(act.actualizado) || 0) ? { ...act, ...ajR } : act;
+    await save("ajustes", { ...base, id: "config", folios, catalogoSembrado: true });
+    res.actualizados++;
+  }
+
+  // Catálogo: si el actual es solo el de fábrica y el respaldo trae uno, se reemplaza.
+  const servR = Array.isArray(data.servicios) ? data.servicios : [];
+  if (servR.length && all("servicios").every((s) => s.semilla)) {
+    for (const s of [...all("servicios")]) await remove("servicios", s.id);
+  }
+
   for (const col of COLLECTIONS) {
+    if (col === "ajustes") continue;
     if (!Array.isArray(data[col])) continue;
     for (const raw of data[col]) {
       const item = limpiarImportado(col, raw);
@@ -228,7 +267,7 @@ export async function importarTodo(data) {
 function seedIfEmpty() {
   // Si la carga falló (ej. permisos) NO sembramos: escribiría encima de datos que no pudimos leer.
   // La marca vive en ajustes/config (compartida entre dispositivos), no en el teléfono.
-  if (cargaFallida || all("servicios").length || ajustes().catalogoSembrado) return;
+  if (fallidas.size || cacheVaciaSinRed || all("servicios").length || ajustes().catalogoSembrado) return;
   // Precios de ejemplo (por unidad); Juan los ajusta en Ajustes → Catálogo.
   const base = [
     ["Piso laminado 8 mm", "m2", 320, 210],
@@ -248,5 +287,6 @@ function seedIfEmpty() {
     ["Retiro de piso existente", "m2", 60, 0]
   ];
   save("ajustes", { ...ajustes(), catalogoSembrado: true });
-  base.forEach(([nombre, unidad, precio, costo]) => save("servicios", { nombre, unidad, precio, costo }));
+  // semilla:true = catálogo de fábrica; se reemplaza si se restaura un respaldo.
+  base.forEach(([nombre, unidad, precio, costo]) => save("servicios", { nombre, unidad, precio, costo, semilla: true }));
 }

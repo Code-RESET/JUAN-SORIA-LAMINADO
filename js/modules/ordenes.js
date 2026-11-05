@@ -157,7 +157,9 @@ export function detalleOrden(id) {
     </div>
     ${t.saldo > 0 ? `
     <form class="pago-form" id="f-pago">
-      <input class="input" name="monto" type="number" inputmode="decimal" step="0.01" placeholder="Monto" value="${t.saldo.toFixed(2)}" required />
+      <!-- Sin monto prellenado: así un doble toque cae en un campo vacío y no cobra dos veces. -->
+      <div class="monto-wrap"><input class="input" name="monto" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Saldo ${money(t.saldo)}" required />
+        <button type="button" class="btn btn-ghost btn-sm" data-llenar-saldo="${t.saldo.toFixed(2)}">Saldo</button></div>
       <select class="input" name="metodo">${METODOS.map((m) => `<option>${m}</option>`).join("")}</select>
       <input class="input" name="fecha" type="date" value="${hoyISO()}" />
       <button class="btn btn-primary" type="submit">Registrar pago</button>
@@ -186,11 +188,17 @@ export function detalleOrden(id) {
   }));
 
   const fp = $("#f-pago", body);
+  const llenar = $("[data-llenar-saldo]", body);
+  if (llenar) llenar.onclick = () => { fp.elements.monto.value = llenar.dataset.llenarSaldo; };
+  let pagando = false; // doble toque = doble cobro: bloquear hasta repintar
   if (fp) fp.onsubmit = async (e) => {
     e.preventDefault();
+    if (pagando) return;
     const f = Object.fromEntries(new FormData(fp).entries());
     const monto = num(f.monto);
     if (monto <= 0) return;
+    pagando = true;
+    fp.querySelectorAll("button, input, select").forEach((el) => (el.disabled = true));
     const act = fresco();
     await store.save("ordenes", { ...act, pagos: [...(act.pagos || []), { monto, metodo: f.metodo, fecha: f.fecha || hoyISO() }] });
     toast("Pago registrado");
@@ -259,7 +267,7 @@ export function formOrden(base = {}) {
 
       <div class="cols-3">
         <label class="field"><span>Descuento $</span><input class="input" name="descuento" type="number" inputmode="decimal" step="0.01" value="${esc(o.descuento || "")}" placeholder="0" /></label>
-        <label class="field check"><input type="checkbox" name="conIva" ${o.conIva ? "checked" : ""} /><span>Agregar IVA ${a.ivaPct}%</span></label>
+        <label class="field check"><input type="checkbox" name="conIva" ${o.conIva ? "checked" : ""} /><span>Agregar IVA ${esc(a.ivaPct)}%</span></label>
         ${editando ? "" : `<label class="field"><span>Anticipo $</span><input class="input" name="anticipo" type="number" inputmode="decimal" step="0.01" placeholder="0" /></label>`}
       </div>
       <div id="resumen-orden"></div>
@@ -319,34 +327,41 @@ export function formOrden(base = {}) {
       $("#btn-guardar-orden", form).disabled = false;
       return;
     }
-    const cliente = await asegurarCliente(f.clienteNombre, f.telefono);
-    const actual = editando ? (store.get("ordenes", o.id) || o) : {};
-    const orden = {
-      ...actual,
-      folio,
-      clienteId: cliente?.id || "",
-      clienteNombre: f.clienteNombre.trim(),
-      telefono: f.telefono.trim(),
-      obra: leerObra(f),
-      servicios,
-      descuento: num(f.descuento),
-      conIva: !!f.conIva,
-      ivaPct: a.ivaPct,
-      fechaIngreso: f.fechaIngreso || hoyISO(),
-      fechaInstalacion: f.fechaInstalacion,
-      estado: f.estado,
-      notas: f.notas.trim(),
-      garantia: f.garantia.trim(),
-      pagos: editando ? (actual.pagos || []) : (num(f.anticipo) > 0 ? [{ monto: num(f.anticipo), metodo: "Efectivo", fecha: hoyISO(), nota: "Anticipo" }] : []),
-      cotizacionId: o.cotizacionId || ""
-    };
-    const saved = await store.save("ordenes", orden);
+    try {
+      const cliente = await asegurarCliente(f.clienteNombre, f.telefono);
+      const actual = editando ? (store.get("ordenes", o.id) || o) : {};
+      const orden = {
+        ...actual,
+        folio,
+        clienteId: cliente?.id || "",
+        clienteNombre: f.clienteNombre.trim(),
+        telefono: f.telefono.trim(),
+        obra: leerObra(f),
+        servicios,
+        descuento: num(f.descuento),
+        conIva: !!f.conIva,
+        ivaPct: a.ivaPct,
+        fechaIngreso: f.fechaIngreso || hoyISO(),
+        fechaInstalacion: f.fechaInstalacion,
+        estado: f.estado,
+        notas: f.notas.trim(),
+        garantia: f.garantia.trim(),
+        pagos: editando ? (actual.pagos || []) : (num(f.anticipo) > 0 ? [{ monto: num(f.anticipo), metodo: "Efectivo", fecha: hoyISO(), nota: "Anticipo" }] : []),
+        cotizacionId: o.cotizacionId || ""
+      };
+      const saved = await store.save("ordenes", orden);
 
-    if (o.cotizacionId) {
-      const cot = store.get("cotizaciones", o.cotizacionId);
-      if (cot) await store.save("cotizaciones", { ...cot, estado: "ACEPTADA", ordenId: saved.id });
+      if (o.cotizacionId) {
+        const cot = store.get("cotizaciones", o.cotizacionId);
+        if (cot) await store.save("cotizaciones", { ...cot, estado: "ACEPTADA", ordenId: saved.id });
+      }
+      toast(editando ? "Trabajo actualizado" : `Trabajo #${fol(saved.folio)} creado`);
+      detalleOrden(saved.id);
+    } catch (err) {
+      reportarError("guardar trabajo", err);
+      toast("No se pudo guardar: " + err.message);
+      enviando = false;
+      $("#btn-guardar-orden", form).disabled = false;
     }
-    toast(editando ? "Trabajo actualizado" : `Trabajo #${fol(saved.folio)} creado`);
-    detalleOrden(saved.id);
   };
 }

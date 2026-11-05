@@ -115,7 +115,8 @@ try {
   });
 
   await paso("registrar pago liquida el saldo", async () => {
-    await page.click("#f-pago button");
+    await page.click("[data-llenar-saldo]");
+    await page.click("#f-pago [type=submit]");
     await page.waitForTimeout(200);
     assert.match((await page.textContent("#modal .resumen")).replace(/\s+/g, " "), /Saldo\$0\.00/);
   });
@@ -207,6 +208,52 @@ try {
     await page.click("#f-serv [type=submit]");
     await page.waitForTimeout(200);
     assert.equal(await page.inputValue("[name=direccion]"), "Dirección a medio escribir");
+    assert.ok(await page.isVisible(".catalogo >> text=Servicio Ejemplo"), "el catálogo sí debe actualizarse");
+  });
+
+  await paso("doble toque en 'Registrar pago' no cobra de más", async () => {
+    await page.goto(B + "#/ordenes/f:POR_COBRAR");
+    await page.click("#lista-ordenes .orden-card");
+    await page.waitForSelector("#f-pago");
+    const antes = (await page.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_ordenes")).map((o) => (o.pagos || []).length).reduce((a, b) => a + b, 0)));
+    await page.fill("#f-pago [name=monto]", "100");
+    await page.evaluate(() => { const b = document.querySelector("#f-pago [type=submit]"); b.click(); b.click(); });
+    await page.waitForTimeout(150);
+    await page.evaluate(() => document.querySelector("#f-pago [type=submit]")?.click()); // toque sobre el formulario repintado
+    await page.waitForTimeout(300);
+    const despues = (await page.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_ordenes")).map((o) => (o.pagos || []).length).reduce((a, b) => a + b, 0)));
+    assert.equal(despues - antes, 1, `se registraron ${despues - antes} pagos`);
+    await page.click("#modal [data-close]");
+  });
+
+  await paso("respaldo en dispositivo nuevo: toma datos del negocio y catálogo; ivaPct malicioso neutralizado", async () => {
+    const c2 = await browser.newContext({ ...devices["iPhone 13"], serviceWorkers: "block" });
+    const p = await c2.newPage();
+    p.on("pageerror", (e) => errores.push("nuevo: " + e.message));
+    await p.goto(B);
+    await p.click("#login-btn");
+    await p.waitForSelector("#app-shell:not([hidden])");
+    const respaldo = {
+      app: "juan-soria-laminado",
+      ajustes: [{ id: "config", negocio: "Negocio Ejemplo Restaurado", ivaPct: "<img src=x onerror=window.__xss=1>", folios: { ordenes: 40 }, actualizado: 1 }],
+      servicios: [{ id: "s1", nombre: "Producto Ejemplo Respaldo", unidad: "m2", precio: 100, costo: 50, actualizado: 1 }]
+    };
+    await p.goto(B + "#/ajustes");
+    await p.setInputFiles("#file-restaurar", { name: "r.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(respaldo)) });
+    await p.click("#confirm [data-ok]");
+    await p.waitForTimeout(300);
+    const st = await p.evaluate(() => ({
+      aj: JSON.parse(localStorage.getItem("jsl_demo_ajustes"))[0],
+      serv: JSON.parse(localStorage.getItem("jsl_demo_servicios")).map((s) => s.nombre)
+    }));
+    assert.equal(st.aj.negocio, "Negocio Ejemplo Restaurado");
+    assert.equal(st.aj.ivaPct, 0, "ivaPct no numérico debe quedar en 0");
+    assert.deepEqual(st.serv, ["Producto Ejemplo Respaldo"], "el catálogo de fábrica se reemplaza");
+    await p.click("#app-content .tab-plus, .tab-plus");
+    await p.waitForSelector("#f-orden");
+    assert.equal(await p.evaluate(() => window.__xss), undefined);
+    await p.click("#modal [data-close]");
+    await c2.close();
   });
 
   await paso("pantallas en teléfono", async () => {

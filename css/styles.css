@@ -255,6 +255,8 @@ body.nav-open .nav-backdrop { display: block; }
 .tabla-lineas em { color: var(--text-dim); font-style: normal; font-size: .8rem; }
 .pago-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pago-form .btn { grid-column: 1 / -1; }
+.monto-wrap { display: flex; gap: 6px; }
+.monto-wrap .btn { grid-column: auto; }
 @media (min-width: 560px) { .pago-form { grid-template-columns: 1fr 1fr 1fr auto; } .pago-form .btn { grid-column: auto; } }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }

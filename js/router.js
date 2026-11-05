@@ -53,8 +53,8 @@ function parseHash() {
   return { path: path || MODULES[0].path, param: rest.join("/") || null };
 }
 
-// Si hay un formulario de la página a medio escribir (ej. Ajustes),
-// un cambio de datos NO repinta: se perdería lo escrito.
+// Formularios de la página a medio escribir (ej. Ajustes): al repintar
+// por un cambio de datos se conserva lo escrito (por id de form + name).
 content.addEventListener("input", (e) => {
   const f = e.target.closest("form");
   if (f) f.setAttribute("data-dirty", "");
@@ -89,7 +89,19 @@ export function initRouter(user) {
     let t;
     onChange(() => {
       clearTimeout(t);
-      t = setTimeout(() => { if (!content.querySelector("form[data-dirty]")) renderRoute(); }, 60);
+      t = setTimeout(() => {
+        const guardado = [...content.querySelectorAll("form[data-dirty][id]")].map((f) => [f.id,
+          [...f.elements].filter((el) => el.name).map((el) => [el.name, el.type === "checkbox" ? el.checked : el.value])]);
+        const activo = document.activeElement?.closest("#app-content form[id]") ? [document.activeElement.form?.id, document.activeElement.name] : null;
+        renderRoute();
+        guardado.forEach(([id, campos]) => {
+          const f = document.getElementById(id);
+          if (!f) return;
+          f.setAttribute("data-dirty", "");
+          campos.forEach(([n, v]) => { const el = f.elements[n]; if (!el) return; if (el.type === "checkbox") el.checked = v; else el.value = v; });
+        });
+        if (activo) document.getElementById(activo[0])?.elements[activo[1]]?.focus();
+      }, 60);
     });
   }
   renderRoute();

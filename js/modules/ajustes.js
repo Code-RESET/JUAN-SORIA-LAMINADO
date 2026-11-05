@@ -78,7 +78,7 @@ export function renderAjustes(container) {
     e.preventDefault();
     e.target.removeAttribute("data-dirty"); // ya se guarda: permitir repintar
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("ajustes", { ...store.ajustes(), ...f, id: "config", ivaPct: num(f.ivaPct), vigenciaDias: num(f.vigenciaDias) || 15 });
+    await store.save("ajustes", { ...store.ajustes(), ...f, id: "config", editado: true, ivaPct: num(f.ivaPct), vigenciaDias: num(f.vigenciaDias) || 15 });
     toast("Datos guardados");
   };
 
@@ -175,7 +175,7 @@ function formServicio(s = {}) {
   $("#f-serv", body).onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("servicios", { ...s, nombre: f.nombre.trim(), unidad: f.unidad, precio: num(f.precio), costo: num(f.costo) });
+    await store.save("servicios", { ...s, semilla: false, nombre: f.nombre.trim(), unidad: f.unidad, precio: num(f.precio), costo: num(f.costo) });
     closeModal();
   };
   const del = $("[data-del]", body);

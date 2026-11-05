@@ -129,7 +129,8 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('service-worker.js').catch(function (err) {
-        console.warn('Service worker no registrado:', err);
+        // Visible en Ajustes → Errores (sin SW la app no funciona offline).
+        import('./js/errores.js').then(function (m) { m.reportarError('service worker', err); });
       });
     });
   }

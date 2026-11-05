@@ -129,7 +129,7 @@ function formCotizacion(c = {}) {
       ${lineasEditorHTML(c.servicios)}
       <div class="cols-3">
         <label class="field"><span>Descuento $</span><input class="input" name="descuento" type="number" inputmode="decimal" step="0.01" value="${esc(c.descuento || "")}" /></label>
-        <label class="field check"><input type="checkbox" name="conIva" ${c.conIva ? "checked" : ""} /><span>Agregar IVA ${a.ivaPct}%</span></label>
+        <label class="field check"><input type="checkbox" name="conIva" ${c.conIva ? "checked" : ""} /><span>Agregar IVA ${esc(a.ivaPct)}%</span></label>
         <label class="field"><span>Vigencia (días)</span><input class="input" name="vigenciaDias" type="number" value="${esc(c.vigenciaDias || a.vigenciaDias)}" /></label>
       </div>
       <div id="resumen-cot"></div>
@@ -171,24 +171,31 @@ function formCotizacion(c = {}) {
       enviando = false; btn.disabled = false;
       return;
     }
-    const cli = await asegurarCliente(f.clienteNombre, f.telefono);
-    const saved = await store.save("cotizaciones", {
-      ...(editando ? (store.get("cotizaciones", c.id) || c) : {}),
-      folio,
-      fecha: c.fecha || hoyISO(),
-      estado: c.estado || "ABIERTA",
-      clienteId: cli?.id || "",
-      clienteNombre: f.clienteNombre.trim(),
-      telefono: f.telefono.trim(),
-      obra: leerObra(f),
-      servicios,
-      descuento: num(f.descuento),
-      conIva: !!f.conIva,
-      ivaPct: a.ivaPct,
-      vigenciaDias: num(f.vigenciaDias) || a.vigenciaDias,
-      notas: f.notas.trim()
-    });
-    toast("Cotización guardada");
-    detalleCot(saved.id);
+    try {
+      const cli = await asegurarCliente(f.clienteNombre, f.telefono);
+      const actual = editando ? (store.get("cotizaciones", c.id) || c) : {};
+      const saved = await store.save("cotizaciones", {
+        ...actual,
+        folio,
+        fecha: actual.fecha || hoyISO(),
+        estado: actual.estado || "ABIERTA",
+        clienteId: cli?.id || "",
+        clienteNombre: f.clienteNombre.trim(),
+        telefono: f.telefono.trim(),
+        obra: leerObra(f),
+        servicios,
+        descuento: num(f.descuento),
+        conIva: !!f.conIva,
+        ivaPct: a.ivaPct,
+        vigenciaDias: num(f.vigenciaDias) || a.vigenciaDias,
+        notas: f.notas.trim()
+      });
+      toast("Cotización guardada");
+      detalleCot(saved.id);
+    } catch (err) {
+      reportarError("guardar cotización", err);
+      toast("No se pudo guardar: " + err.message);
+      enviando = false; btn.disabled = false;
+    }
   };
 }

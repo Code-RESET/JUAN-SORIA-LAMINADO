@@ -15,7 +15,7 @@ let mes = mesClave(hoyISO());
 // Safari de escritorio muestran como texto libre.
 function opcionesMes() {
   const meses = new Set(store.all("gastos").map((g) => mesClave(g.fecha)).filter((m) => /^\d{4}-\d{2}$/.test(m)));
-  const d = new Date(hoyISO() + "T12:00:00");
+  const d = new Date(hoyISO().slice(0, 8) + "01T12:00:00"); // día 1: setMonth no se desborda
   for (let i = 0; i < 12; i++) { meses.add(mesClave(d.toISOString())); d.setMonth(d.getMonth() - 1); }
   meses.add(mes);
   return [...meses].sort().reverse().map((m) => {
