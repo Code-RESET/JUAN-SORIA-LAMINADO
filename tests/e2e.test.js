@@ -427,6 +427,9 @@ try {
   });
 
   await paso("cotizador: sus materiales y precio por m² (solo se guardan los que tienen precio)", async () => {
+    await j.waitForTimeout(400); // deja pasar el repintado por el guardado del paso 1
+    assert.equal(await j.evaluate(() => location.hash), "#/bienvenida", "el asistente no debe cerrarse a medias");
+    assert.ok(await j.isVisible("#onb-mat"));
     const err = j.locator("#mat-err");
     await j.click("#onb-mat [type=submit]");               // sin ningún precio -> aviso
     assert.ok(await err.isVisible());
@@ -526,7 +529,37 @@ try {
     assert.ok(await j.isVisible("#login-logo-cliente"));
     await j.screenshot({ path: `${OUT}/c7-login.png` });
   });
+  await paso("cotizador: la bienvenida no se vuelve a abrir una vez terminada", async () => {
+    await j.click("#login-btn");
+    await j.waitForSelector("#app-shell:not([hidden])");
+    await j.goto(B + "#/bienvenida");
+    await j.waitForSelector("#lista-cot");
+    assert.equal(await j.evaluate(() => location.hash), "#/cotizaciones");
+  });
   await cj.close();
+
+  await paso("cotizador: quien ya usaba la app (versión anterior) no pierde nada", async () => {
+    const cv = await browser.newContext({ ...devices["iPhone 13"], serviceWorkers: "block" });
+    // Datos que dejó la versión anterior: un trabajo y un material sin editar.
+    await cv.addInitScript(() => {
+      if (localStorage.getItem("jsl_demo_ordenes")) return;
+      localStorage.setItem("jsl_demo_ordenes", JSON.stringify([{ id: "o1", folio: 1, clienteNombre: "Cliente Ejemplo Viejo", estado: "MEDICION", servicios: [{ descripcion: "Piso", cantidad: 10, unidad: "m2", precio: 300 }], pagos: [] }]));
+      localStorage.setItem("jsl_demo_servicios", JSON.stringify([{ id: "s1", nombre: "Piso laminado 8 mm", unidad: "m2", precio: 320, costo: 210, semilla: true }]));
+      localStorage.setItem("jsl_demo_ajustes", JSON.stringify([{ id: "config", catalogoSembrado: true }]));
+    });
+    const v = await cv.newPage();
+    v.on("pageerror", (e) => errores.push("previo: " + e.message));
+    await v.goto(B);
+    await v.click("#login-btn");
+    await v.waitForSelector("#app-shell:not([hidden])");
+    await v.waitForTimeout(200);
+    assert.notEqual(await v.evaluate(() => location.hash), "#/bienvenida", "no debe forzar la bienvenida");
+    assert.equal(await v.locator("#app-nav a.locked").count(), 0, "no se le bloquea lo que ya usaba");
+    await v.goto(B + "#/ordenes/f:TODAS");
+    await v.waitForSelector("#lista-ordenes .orden-card");
+    assert.equal(await v.evaluate(() => JSON.parse(localStorage.getItem("jsl_demo_servicios")).length), 1, "no borra materiales");
+    await cv.close();
+  });
 
   await paso("sin errores de JavaScript en toda la prueba", async () => {
     assert.deepEqual(errores, []);

@@ -15,6 +15,7 @@ import { totales } from "./lineas.js";
 import * as store from "./store.js";
 import { ESTADOS, UNIDADES, obraTxt } from "./documento.js";
 import { logoValido } from "./marca.js";
+import { reportarError } from "./errores.js";
 
 let cargando = null;
 function cargarJsPDF() {
@@ -78,7 +79,7 @@ export async function generarPDF(tipo, doc) {
       const lw = p.width * k, lh = p.height * k;
       pdf.addImage(a.logo, fmt, M, y, lw, lh);
       xTxt = M + lw + 5; altoLogo = lh;
-    } catch { /* logo ilegible: el PDF sale sin él */ }
+    } catch (e) { reportarError("logo en PDF", e); /* el PDF sale sin logo */ }
   }
   const anchoTxt = ancho - 62 - (xTxt - M);
   set(15, "bold");

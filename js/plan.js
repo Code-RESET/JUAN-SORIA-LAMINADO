@@ -11,6 +11,8 @@
 // y volver a publicar (subir CACHE_VERSION en service-worker.js).
 // ============================================================
 
+import * as store from "./store.js";
+
 export const PLAN = "cotizador"; // "cotizador" | "completo"
 
 // A quién avisa el botón "Me interesa" de las secciones bloqueadas.
@@ -52,6 +54,13 @@ export function planActivo() {
   return PLAN;
 }
 
+// Quien ya usó Trabajos o Gastos (versión anterior de la demo o un
+// respaldo) los conserva: quitarle algo que ya usaba sí se siente como
+// pérdida. Solo se bloquea lo que nunca ha usado.
+export function usoPrevio() {
+  return store.all("ordenes").length > 0 || store.all("gastos").length > 0;
+}
+
 export function desbloqueado(path) {
-  return planActivo() === "completo" || !(path in PAQUETE_COMPLETO);
+  return planActivo() === "completo" || !(path in PAQUETE_COMPLETO) || usoPrevio();
 }

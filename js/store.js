@@ -185,6 +185,12 @@ const DEFAULT_AJUSTES = {
   vigenciaDias: 15
 };
 
+// false mientras ajustes no se pudo leer o solo viene de una cache vacía
+// sin confirmar: en ese estado no se debe decidir "es la primera vez".
+export function ajustesConfiables() {
+  return !fallidas.has("ajustes") && !sinConfirmar.has("ajustes");
+}
+
 export function ajustes() {
   return { ...DEFAULT_AJUSTES, ...(get("ajustes", "config") || {}) };
 }

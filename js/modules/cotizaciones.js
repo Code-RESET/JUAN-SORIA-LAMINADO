@@ -68,7 +68,7 @@ function pintar(container) {
       <div class="card-title">${esc(c.clienteNombre || "")}</div>
       <div class="small">${esc((c.servicios || []).map((s) => s.descripcion).slice(0, 2).join(" + "))}</div>
       <div class="muted small">${esc(obraTxt(c.obra) || "")}${obraTxt(c.obra) ? " · " : ""}${fecha(c.fecha)}</div>
-      <div class="orden-bottom"><strong>${money(totales(c).total)}</strong>${totales(c).costo ? `<span class="pill ok" title="Tu ganancia (solo tú la ves)">+${money(totales(c).utilidad)}</span>` : ""}</div>
+      <div class="orden-bottom"><strong>${money(totales(c).total)}</strong>${totales(c).costo ? `<span class="pill ${totales(c).utilidad < 0 ? "bad" : "ok"}" title="Tu ganancia (solo tú la ves)">${totales(c).utilidad < 0 ? "" : "+"}${money(totales(c).utilidad)}</span>` : ""}</div>
     </div>`).join("")}</div>` : emptyState("📄", "No hay cotizaciones en este filtro.");
   el.querySelectorAll("[data-id]").forEach((n) => (n.onclick = () => detalleCot(n.dataset.id)));
 }
@@ -88,7 +88,7 @@ function detalleCot(id) {
     ${resumenHTML(t)}
     ${c.notas ? `<p class="muted">${esc(c.notas)}</p>` : ""}
     <div class="form-actions wrap">
-      ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver trabajo</button>`
+      ${c.ordenId && desbloqueado("ordenes") ? `<button class="btn btn-primary" data-act="ver-orden">Ver trabajo</button>`
         : desbloqueado("ordenes")
           ? `<button class="btn btn-primary" data-act="convertir">✅ Convertir en trabajo</button>`
           : `<a class="btn btn-ghost locked-btn" href="#/ordenes" title="Paquete completo">🔒 Convertir en trabajo</a>`}

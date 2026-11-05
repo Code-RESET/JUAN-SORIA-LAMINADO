@@ -8,6 +8,7 @@
 // ============================================================
 
 import * as store from "./store.js";
+import { reportarError } from "./errores.js";
 
 const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 const CACHE_KEY = "jsl_marca";
@@ -55,7 +56,8 @@ export function aplicarMarca() {
     img.hidden = !logo;
     if (logo) img.src = logo; else img.removeAttribute("src");
   });
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ nombre, logo })); } catch {}
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ nombre, logo })); }
+  catch (e) { reportarError("guardar logo para el login", e); }
 }
 
 // Login: usa la última marca vista en este teléfono (si hay).

@@ -17,8 +17,15 @@ import { CONTACTO } from "../plan.js";
 
 let paso = 1;
 
+// "Primera vez" = no hay ajustes del dueño ni datos previos. Quien ya
+// usaba la app (versión anterior) NO pasa por el asistente.
 export function onboardingPendiente() {
-  return !store.ajustes().onboarding;
+  if (!store.ajustesConfiables()) return false; // sin leer ajustes no se decide nada
+  const a = store.ajustes();
+  if (a.onboarding) return false;
+  if (a.enBienvenida) return true;   // a medio asistente
+  if (a.editado) return false;       // ya configuró su negocio en una versión anterior
+  return !["cotizaciones", "ordenes", "clientes", "gastos"].some((c) => store.all(c).length);
 }
 
 export function renderBienvenida(container) {
@@ -78,7 +85,8 @@ function pasoNegocio(container) {
     e.preventDefault();
     e.target.removeAttribute("data-dirty");
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("ajustes", { ...store.ajustes(), id: "config", editado: true, negocioEditado: true,
+    // enBienvenida (no "editado"): el asistente sigue abierto hasta el paso 2.
+    await store.save("ajustes", { ...store.ajustes(), id: "config", enBienvenida: true,
       negocio: f.negocio.trim(), telefono: f.telefono.trim(), direccion: f.direccion.trim(), logo });
     aplicarMarca();
     paso = 2;
@@ -139,7 +147,12 @@ function pasoMateriales(container) {
         const id = f.dataset.id;
         const actual = id ? store.get("servicios", id) : null;
         const guardar = conPrecio.includes(f);
-        if (!guardar) { if (actual) await store.remove("servicios", id); continue; }
+        if (!guardar) {
+          // Solo se borra lo que el usuario quitó con ✕ o un ejemplo sin precio;
+          // un material suyo con precio 0 (p. ej. "visita gratis") se respeta.
+          if (actual && (f.dataset.borrar || actual.semilla)) await store.remove("servicios", id);
+          continue;
+        }
         await store.save("servicios", {
           ...(actual || {}), semilla: false,
           // El tamaño de caja de ejemplo es inventado: no se conserva a escondidas.
@@ -148,7 +161,7 @@ function pasoMateriales(container) {
           precio: num($(".m-precio", f).value), costo: num($(".m-costo", f).value)
         });
       }
-      await store.save("ajustes", { ...store.ajustes(), id: "config", onboarding: true, catalogoSembrado: true });
+      await store.save("ajustes", { ...store.ajustes(), id: "config", onboarding: true, enBienvenida: false, editado: true, catalogoSembrado: true });
       paso = 1;
       toast("¡Listo! Ahora cotiza tu primer piso");
       location.hash = "#/cotizaciones";

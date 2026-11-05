@@ -97,8 +97,10 @@ export function renderAjustes(container) {
   };
   const quitar = $("#aj-logo-quitar", container);
   if (quitar) quitar.onclick = async () => {
-    await store.save("ajustes", { ...store.ajustes(), id: "config", logo: "" });
-    aplicarMarca();
+    try {
+      await store.save("ajustes", { ...store.ajustes(), id: "config", editado: true, logo: "" });
+      aplicarMarca();
+    } catch (err) { reportarError("quitar logo", err); }
   };
 
   $("#f-negocio", container).onsubmit = async (e) => {

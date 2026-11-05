@@ -104,6 +104,10 @@ function renderRoute() {
     history.replaceState(null, "", "#/bienvenida");
     path = "bienvenida"; param = null;
   }
+  if (path === "bienvenida" && !onboardingPendiente()) {
+    history.replaceState(null, "", "#/" + inicio());
+    path = inicio(); param = null;
+  }
   const mod = MODULES.find((m) => m.path === path) || OCULTOS.find((m) => m.path === path) || MODULES.find((m) => m.path === inicio());
 
   document.querySelectorAll("[data-path]").forEach((a) => a.classList.toggle("active", a.dataset.path === mod.path));
@@ -139,6 +143,7 @@ export function initRouter(user) {
           [...f.elements].filter((el) => el.name).map((el) => [el.name, el.type === "checkbox" ? el.checked : el.value])]);
         const activo = document.activeElement?.closest("#app-content form[id]") ? [document.activeElement.form?.id, document.activeElement.name] : null;
         aplicarMarca();
+        buildNav(); // los candados dependen de los datos (uso previo)
         renderRoute();
         guardado.forEach(([id, campos]) => {
           const f = document.getElementById(id);
