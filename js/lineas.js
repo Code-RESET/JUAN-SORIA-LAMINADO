@@ -28,6 +28,21 @@ export function totales(doc) {
   return { subtotal, costo, descuento, iva, total, pagado, saldo: r2(Math.max(total - pagado, 0)), utilidad: r2(base - costo) };
 }
 
+// Calculadora de m²: medida1 × medida2 + % de merma, redondeado HACIA
+// ARRIBA a centésimas (mejor que sobre material a que falte).
+// Por qué el Math.round previo: en JavaScript 4.2 × 3.5 × 1.1 da
+// 16.170000000000002 y un Math.ceil directo lo subía a 16.18.
+// Medidas negativas o vacías cuentan como 0; la merma va de 0 a 100 %.
+export function calcularM2(medida1, medida2, mermaPct = 0) {
+  const a = Math.max(num(medida1), 0);
+  const b = Math.max(num(medida2), 0);
+  const merma = Math.min(Math.max(num(mermaPct), 0), 100);
+  const area = Math.round(a * b * 1e6) / 1e6;
+  const conMerma = area * (1 + merma / 100);
+  const total = Math.ceil(Math.round(conMerma * 1e6) / 1e4) / 100;
+  return { area, total };
+}
+
 function rowHTML(l = {}) {
   const u = l.unidad || "m2";
   return `
@@ -107,10 +122,12 @@ export function bindLineas(root, onUpdate) {
   let resultado = 0;
   $("#toggle-calc", root).onclick = () => { calc.hidden = !calc.hidden; if (!calc.hidden) $(".c-a", calc).focus(); };
   calc.addEventListener("input", () => {
-    const area = num($(".c-a", calc).value) * num($(".c-b", calc).value);
-    resultado = Math.ceil(area * (1 + num($(".c-merma", calc).value) / 100) * 100) / 100;
+    const r = calcularM2($(".c-a", calc).value, $(".c-b", calc).value, $(".c-merma", calc).value);
+    const area = r.area;
+    resultado = r.total;
     $(".c-res", calc).textContent = resultado.toFixed(2) + " m²";
-    $(".c-det", calc).textContent = area ? `(${area.toFixed(2)} m² + merma)` : "";
+    const m = Math.min(Math.max(num($(".c-merma", calc).value), 0), 100);
+    $(".c-det", calc).textContent = area ? `(${area.toFixed(2)} m²${m ? ` + ${m}% merma` : ", sin merma"})` : "";
   });
   $("#calc-usar", root).onclick = () => {
     if (!resultado) return;

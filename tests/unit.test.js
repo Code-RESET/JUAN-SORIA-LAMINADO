@@ -133,3 +133,32 @@ test("fecha: un texto que no es fecha sale escapado (anti-XSS)", async () => {
   assert.equal(fecha("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;");
   assert.equal(fecha("2026-11-05"), "5 nov 2026");
 });
+
+test("calculadora de m²: resultados exactos y redondeo hacia arriba", async () => {
+  const { calcularM2 } = await import("../js/lineas.js");
+  const casos = [
+    // [medida1, medida2, merma%, esperado]
+    [4.2, 3.5, 10, 16.17],   // antes daba 16.18 por error de punto flotante
+    [1.1, 1.1, 0, 1.21],     // antes daba 1.22
+    [5, 4, 10, 22],
+    [3, 3, 10, 9.9],
+    [2.5, 4, 10, 11],
+    [4.2, 3.5, 0, 14.7],
+    [6.1, 3, 5, 19.22],      // 19.215 -> sube a 19.22 (no falta material)
+    [3.33, 2.87, 8, 10.33],  // 9.5571 × 1.08 = 10.321668 -> 10.33
+    [0.7, 0.1, 0, 0.07],
+    [12.35, 8.4, 12, 116.19] // 103.74 × 1.12 = 116.1888 -> 116.19
+  ];
+  for (const [a, b, m, esp] of casos) {
+    assert.equal(calcularM2(a, b, m).total, esp, `${a} × ${b} + ${m}%`);
+  }
+});
+
+test("calculadora de m²: entradas inválidas no dan resultados raros", async () => {
+  const { calcularM2 } = await import("../js/lineas.js");
+  assert.equal(calcularM2("", 3, 10).total, 0);
+  assert.equal(calcularM2(-4, 3, 10).total, 0);
+  assert.equal(calcularM2(4, 3, -50).total, 12);    // merma negativa = 0 %
+  assert.equal(calcularM2(4, 3, 500).total, 24);    // merma máxima 100 %
+  assert.equal(calcularM2("4.5", "2", "").total, 9);
+});
