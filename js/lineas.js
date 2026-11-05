@@ -123,6 +123,7 @@ export function bindLineas(root, onUpdate) {
   const cont = $("#lineas", root);
   const cat = store.all("servicios");
   const producto = (row) => {
+    if (!row) return null;
     const d = $(".l-desc", row).value.trim().toLowerCase();
     return d ? cat.find((x) => x.nombre.toLowerCase() === d) : null;
   };
@@ -207,7 +208,7 @@ export function bindLineas(root, onUpdate) {
     r = calcularAreas(pares, $(".c-merma", calc).value);
     $(".c-area", calc).textContent = r.area.toFixed(2) + " m²";
     $(".c-res", calc).textContent = r.total.toFixed(2) + " m²" + (r.merma ? ` (+${r.merma}%)` : "");
-    const s = producto(filaDestino() || {});
+    const s = producto(filaDestino());
     const cj = s ? calcularCajas(r.total, s.m2Caja) : null;
     $(".c-cajas-box", calc).hidden = !cj;
     if (cj) $(".c-cajas", calc).textContent = `${cj.cajas} cajas = ${cj.m2.toFixed(2)} m²`;
@@ -242,11 +243,15 @@ export function bindLineas(root, onUpdate) {
     onUpdate();
   };
   $("#calc-usar", calc).onclick = () => {
-    const s = producto(filaDestino() || {});
+    const s = producto(filaDestino());
     const cj = s ? calcularCajas(r.total, s.m2Caja) : null;
     aplicar(cj ? cj.m2 : r.total, cj ? cj.cajas : null);
   };
   $("#calc-usar-real", calc).onclick = () => aplicar(r.area, null);
+
+  // El selector "Aplicar a" se llena desde el inicio: antes quedaba vacío
+  // y editar primero el precio rompía el recálculo de totales.
+  llenarDestinos();
 }
 
 export function leerLineas(root) {

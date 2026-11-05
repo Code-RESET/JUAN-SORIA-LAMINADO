@@ -149,6 +149,16 @@ try {
     await page.click("#modal [data-close]");
   });
 
+  await paso("editar el precio ANTES que la descripción recalcula el total (sin errores)", async () => {
+    await page.goto(B + "#/ordenes");
+    await page.click(".tab-plus");
+    await page.waitForSelector("#f-orden");
+    await page.fill(".l-precio", "250");
+    await page.fill(".l-cant", "4");
+    assert.match((await page.textContent("#resumen-orden")).replace(/\s+/g, " "), /TOTAL\$1,000\.00/);
+    await page.click("#modal [data-close]");
+  });
+
   await paso("'Aplicar a' sigue al concepto elegido aunque se borre otro", async () => {
     await page.goto(B + "#/ordenes");
     await page.click(".tab-plus");
