@@ -168,7 +168,7 @@ export function detalleOrden(id) {
     ${o.notas ? `<h4 class="section-label">Notas</h4><p>${esc(o.notas)}</p>` : ""}
 
     <div class="form-actions wrap">
-      <button class="btn btn-ghost" data-act="doc">🖨️ Imprimir / PDF</button>
+      <button class="btn btn-ghost" data-act="doc">📄 PDF / WhatsApp</button>
       ${o.telefono ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="${waLink(o.telefono, mensajeWA(o, t, a))}">💬 ${o.estado === "TERMINADO" ? "Agradecer / cobrar" : o.fechaInstalacion ? "Confirmar instalación" : "WhatsApp"}</a>` : ""}
       <button class="btn btn-ghost" data-act="edit">✏️ Editar</button>
       <button class="btn btn-danger" data-act="del">🗑️</button>

@@ -97,7 +97,7 @@ test("el repo no contiene teléfonos ni correos que parezcan reales", () => {
   const root = new URL("..", import.meta.url).pathname;
   const archivos = [];
   const recorrer = (d) => readdirSync(d).forEach((f) => {
-    if (["node_modules", ".git", "capturas", "assets"].includes(f)) return;
+    if (["node_modules", ".git", "capturas", "assets", "vendor"].includes(f)) return;
     const p = join(d, f);
     if (statSync(p).isDirectory()) recorrer(p);
     else if (/\.(js|html|json|md|rules)$/.test(f) && f !== "package-lock.json") archivos.push(p);

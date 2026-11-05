@@ -132,6 +132,41 @@ try {
     await page.click("#modal [data-close]");
   });
 
+  await paso("PDF de cotización: se genera, se descarga y es un PDF válido", async () => {
+    await page.goto(B + "#/cotizaciones");
+    await page.click('#filtros-cot [data-f="TODAS"]');
+    await page.click("#lista-cot [data-id]");
+    await page.click("[data-act=doc]");
+    await page.waitForSelector("[data-doc-share]:not([disabled])", { timeout: 15000 });
+    assert.match(await page.textContent("[data-doc-share]"), /Enviar PDF/);
+    await page.screenshot({ path: `${OUT}/5b-documento-pdf.png` });
+    const [descarga] = await Promise.all([page.waitForEvent("download"), page.click("[data-doc-download]")]);
+    assert.match(descarga.suggestedFilename(), /^Cotizacion-\d{4}-.+\.pdf$/);
+    const ruta = await descarga.path();
+    const { readFile: rf } = await import("node:fs/promises");
+    const bytes = await rf(ruta);
+    assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
+    assert.ok(bytes.length > 2000 && bytes.length < 200000, `tamaño ${bytes.length}`);
+    const { copyFile } = await import("node:fs/promises");
+    await copyFile(ruta, `${OUT}/cotizacion-ejemplo.pdf`);
+  });
+
+  await paso("Enviar PDF: comparte el ARCHIVO (no texto) con el menú del teléfono", async () => {
+    await page.evaluate(() => {
+      window.__compartido = null;
+      navigator.canShare = (d) => !!(d && d.files && d.files.length);
+      navigator.share = async (d) => { window.__compartido = { n: d.files.length, tipo: d.files[0].type, nombre: d.files[0].name, texto: d.text || null }; };
+    });
+    await page.click("[data-doc-share]");
+    await page.waitForFunction(() => window.__compartido);
+    const c = await page.evaluate(() => window.__compartido);
+    assert.equal(c.n, 1);
+    assert.equal(c.tipo, "application/pdf");
+    assert.match(c.nombre, /\.pdf$/);
+    await page.click("[data-doc-close]");
+    await page.click("#modal [data-close]");
+  });
+
   await paso("cotización → trabajo", async () => {
     await page.goto(B + "#/cotizaciones");
     await page.click("#lista-cot [data-id]");

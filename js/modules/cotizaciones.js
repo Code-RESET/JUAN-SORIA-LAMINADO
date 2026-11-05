@@ -86,7 +86,7 @@ function detalleCot(id) {
     <div class="form-actions wrap">
       ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver trabajo</button>`
         : `<button class="btn btn-primary" data-act="convertir">✅ Convertir en trabajo</button>`}
-      <button class="btn btn-ghost" data-act="doc">🖨️ PDF / WhatsApp</button>
+      <button class="btn btn-ghost" data-act="doc">📄 PDF / WhatsApp</button>
       <button class="btn btn-ghost" data-act="edit">✏️ Editar</button>
       ${c.estado === "ABIERTA" ? `<button class="btn btn-ghost" data-act="rechazar">Rechazada</button>` : ""}
       <button class="btn btn-danger" data-act="del">🗑️</button>
