@@ -100,17 +100,33 @@ try {
     await page.click("#toggle-calc");
     await page.fill(".c-a", "5");
     await page.fill(".c-b", "4");          // 20 m² + 10% merma = 22 m²
+    // SPC del catálogo: 2.23 m² por caja -> 22 m² = 10 cajas = 22.30 m²
+    assert.match(await page.textContent(".c-cajas"), /10 cajas = 22\.30 m²/);
     await page.click("#calc-usar");
-    assert.equal(await page.inputValue(".l-cant"), "22");
+    assert.equal(await page.inputValue(".l-cant"), "22.3");
     assert.equal(await page.inputValue(".l-unidad"), "m2");
     assert.equal(await page.inputValue(".l-precio"), "480"); // precio del catálogo
+    assert.match(await page.textContent(".l-cajas"), /10 cajas/);
+    // Segunda línea: instalación cobrada sobre el ÁREA REAL (sin merma ni cajas)
+    await page.click("#add-linea");
+    await page.locator(".l-desc").nth(1).fill("Instalación de piso");
+    await page.click("#calc-add");
+    await page.locator(".c-a").nth(1).fill("2");
+    await page.locator(".c-b").nth(1).fill("1.5");          // 20 + 3 = 23 m² reales
+    assert.match(await page.textContent(".c-area"), /23\.00 m²/);
+    await page.selectOption(".c-dest", "1");
+    await page.click("#calc-usar-real");
+    assert.equal(await page.locator(".l-cant").nth(1).inputValue(), "23");
+    await page.locator(".l-desc").nth(1).evaluate((el) => el.blur());
     await page.fill("[name=anticipo]", "5000");
     await page.screenshot({ path: `${OUT}/3-form.png` });
     await page.click("#btn-guardar-orden");
     await page.waitForSelector("#modal .resumen");
     const r = (await page.textContent("#modal .resumen")).replace(/\s+/g, " ");
-    assert.match(r, /TOTAL\$10,560\.00/);
-    assert.match(r, /Saldo\$5,560\.00/);
+    // 22.30 × 480 = 10,704 + 23 × 120 = 2,760 -> 13,464
+    assert.match(r, /TOTAL\$13,464\.00/);
+    assert.match(r, /Saldo\$8,464\.00/);
+    assert.match(await page.textContent("#modal .tabla-lineas"), /10 cajas/);
     await page.screenshot({ path: `${OUT}/4-detalle.png` });
   });
 
@@ -126,7 +142,8 @@ try {
     await page.waitForSelector(".estado-opt.e-INSTALACION.sel");
     await page.click("[data-act=doc]");
     await page.waitForSelector("#doc-overlay:not([hidden]) .doc");
-    assert.match(await page.textContent(".doc"), /22 m²/);
+    assert.match(await page.textContent(".doc"), /22\.3 m²/);
+    assert.match(await page.textContent(".doc"), /10 cajas/);
     await page.screenshot({ path: `${OUT}/5-documento.png` });
     await page.click("[data-doc-close]");
     await page.click("#modal [data-close]");

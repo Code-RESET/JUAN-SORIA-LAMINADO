@@ -231,10 +231,23 @@ body.nav-open .nav-backdrop { display: block; }
 }
 .calc { background: rgba(96,165,250,.06); border: 1px solid rgba(96,165,250,.3); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
 .calc-title { font-weight: 600; margin-bottom: 8px; }
-.calc-grid { display: grid; grid-template-columns: 1fr 1fr 80px; gap: 8px; }
-.calc-grid label span { display: block; font-size: .68rem; color: var(--text-dim); margin-bottom: 3px; }
-.calc-res { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-.c-res { color: var(--info); font-size: 1.1rem; }
+.calc-areas { display: grid; gap: 8px; }
+.calc-area { display: grid; grid-template-columns: 1fr auto 1fr 64px auto; gap: 6px; align-items: end; }
+.calc-area label span, .calc-merma-l span { display: block; font-size: .68rem; color: var(--text-dim); margin-bottom: 3px; }
+.calc-x { padding-bottom: 12px; color: var(--text-dim); }
+.calc-sub { padding-bottom: 13px; text-align: right; }
+.calc-area .c-del { padding-bottom: 10px; }
+.calc-opts { display: flex; justify-content: space-between; align-items: end; gap: 10px; margin: 10px 0; }
+.calc-merma-l { width: 90px; }
+.calc-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.calc-out > div { background: var(--bg-2); border-radius: 8px; padding: 8px 10px; }
+.calc-out span { display: block; font-size: .68rem; color: var(--text-dim); }
+.calc-out strong { font-size: 1rem; }
+.c-res { color: var(--info); }
+.c-cajas { color: var(--accent); }
+.calc-dest { margin-bottom: 8px; }
+.calc-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.l-cajas { color: var(--accent); }
 .obra-box { background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: .85rem; }
 .obra-box a { color: var(--info); }
 .link-card { text-decoration: none; margin-top: 10px; }

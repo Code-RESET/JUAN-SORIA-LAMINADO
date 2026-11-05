@@ -133,13 +133,16 @@ export async function generarPDF(tipo, doc) {
   lineasDoc.forEach((l) => {
     set(9.5);
     const desc = pdf.splitTextToSize(txt(l.descripcion), cols[0].w - 5);
-    const alto = Math.max(8, desc.length * 4.4 + 3.6);
+    const alto = Math.max(l.cajas ? 12 : 8, desc.length * 4.4 + 3.6); // 2º renglón para "(N cajas)"
     if (salto(alto)) encabezadoTabla();
     set(9.5);
     pdf.text(desc, M + 2.5, y + 5.4);
     const cant = `${Number(l.cantidad || 1).toLocaleString("es-MX", { maximumFractionDigits: 2 })} ${UNIDADES[l.unidad] || ""}`.trim();
+    const cajasTxt = l.cajas ? `(${Number.parseInt(l.cajas, 10)} cajas)` : "";
     let x = M + cols[0].w;
-    pdf.text(txt(cant), x + cols[1].w / 2, y + 5.4, { align: "center" }); x += cols[1].w;
+    pdf.text(txt(cant), x + cols[1].w / 2, y + 5.4, { align: "center" });
+    if (cajasTxt) { set(8, "normal", GRIS); pdf.text(cajasTxt, x + cols[1].w / 2, y + 9.4, { align: "center" }); set(9.5); }
+    x += cols[1].w;
     pdf.text(money(l.precio), x + cols[2].w - 2.5, y + 5.4, { align: "right" }); x += cols[2].w;
     pdf.text(money((l.cantidad || 1) * l.precio), x + cols[3].w - 2.5, y + 5.4, { align: "right" });
     y += alto;

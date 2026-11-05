@@ -167,3 +167,24 @@ test("calculadora de m²: medidas de 3 decimales con merma decimal", async () =>
   const { calcularM2 } = await import("../js/lineas.js");
   assert.equal(calcularM2(3.247, 4.724, 9.2).total, 16.76); // 16.750000176 -> sube a 16.76
 });
+
+test("calculadora: suma de varias áreas (cuarto en L) + merma", async () => {
+  const { calcularAreas } = await import("../js/lineas.js");
+  // L = 4.20×3.50 + 2.10×1.80 = 14.70 + 3.78 = 18.48 m²; +10% = 20.328 -> 20.33
+  const r = calcularAreas([[4.2, 3.5], [2.1, 1.8]], 10);
+  assert.equal(r.area, 18.48);
+  assert.equal(r.total, 20.33);
+  // Áreas vacías o negativas no suman
+  assert.equal(calcularAreas([[4, 3], ["", 2], [-1, 5]], 0).total, 12);
+  assert.equal(calcularAreas([], 10).total, 0);
+});
+
+test("cajas: redondea a cajas completas y da los m² reales a cobrar", async () => {
+  const { calcularCajas } = await import("../js/lineas.js");
+  assert.deepEqual(calcularCajas(16.17, 2.13), { cajas: 8, m2: 17.04 });   // 7.59 cajas -> 8
+  assert.deepEqual(calcularCajas(21.3, 2.13), { cajas: 10, m2: 21.3 });    // exacto: 10, no 11
+  assert.deepEqual(calcularCajas(6.69, 2.23), { cajas: 3, m2: 6.69 });     // 2.23×3 sin error de punto flotante
+  assert.deepEqual(calcularCajas(22, 2.23), { cajas: 10, m2: 22.3 });
+  assert.equal(calcularCajas(10, ""), null);   // producto sin m² por caja
+  assert.equal(calcularCajas(0, 2.13), null);
+});

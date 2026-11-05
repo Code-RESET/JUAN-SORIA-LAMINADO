@@ -36,7 +36,7 @@ export function abrirDocumento(tipo, doc) {
   const folio = esc(String(doc.folio || "").padStart(4, "0"));
 
   const filas = (doc.servicios || []).map((l) => `
-    <tr><td>${esc(l.descripcion)}</td><td class="c">${esc(l.cantidad || 1)} ${UNIDADES[l.unidad] || ""}</td>
+    <tr><td>${esc(l.descripcion)}</td><td class="c">${esc(l.cantidad || 1)} ${UNIDADES[l.unidad] || ""}${l.cajas ? `<br><small>(${esc(l.cajas)} cajas)</small>` : ""}</td>
     <td class="r">${money(l.precio)}</td><td class="r">${money((l.cantidad || 1) * l.precio)}</td></tr>`).join("");
 
   const pagos = esOrden && (doc.pagos || []).length ? `

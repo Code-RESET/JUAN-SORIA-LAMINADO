@@ -229,8 +229,9 @@ function limpiarImportado(col, item) {
   }
   if (Array.isArray(x.pagos)) x.pagos = x.pagos.map((p) => ({ ...p, monto: Number(p?.monto) || 0, metodo: String(p?.metodo ?? ""), fecha: FECHA_RE.test(String(p?.fecha)) ? p.fecha : "" }));
   else if ("pagos" in x) x.pagos = [];
-  if (Array.isArray(x.servicios)) x.servicios = x.servicios.map((l) => ({ ...l, descripcion: String(l?.descripcion ?? ""), cantidad: Number(l?.cantidad) || 1, precio: Number(l?.precio) || 0, costo: Number(l?.costo) || 0 }));
+  if (Array.isArray(x.servicios)) x.servicios = x.servicios.map((l) => ({ ...l, descripcion: String(l?.descripcion ?? ""), cantidad: Number(l?.cantidad) || 1, precio: Number(l?.precio) || 0, costo: Number(l?.costo) || 0, ...(l?.cajas ? { cajas: Number.parseInt(l.cajas, 10) || undefined } : {}) }));
   else if ("servicios" in x) x.servicios = [];
+  if ("m2Caja" in x) x.m2Caja = Number(x.m2Caja) > 0 ? Number(x.m2Caja) : "";
   for (const k of ["ivaPct", "vigenciaDias", "monto", "precio", "costo", "descuento"]) if (k in x) x[k] = Number(x[k]) || 0;
   for (const k of ["nombre", "clienteNombre", "telefono", "concepto", "categoria", "negocio"]) if (k in x) x[k] = String(x[k] ?? "");
   if ((col === "clientes" || col === "servicios") && !String(x.nombre ?? "").trim()) return null;
@@ -285,12 +286,12 @@ function seedIfEmpty() {
   // Si la carga falló (ej. permisos) NO sembramos: escribiría encima de datos que no pudimos leer.
   // La marca vive en ajustes/config (compartida entre dispositivos), no en el teléfono.
   if (fallidas.size || sinConfirmar.size || all("servicios").length || ajustes().catalogoSembrado) return;
-  // Precios de ejemplo (por unidad); Juan los ajusta en Ajustes → Catálogo.
+  // Precios y m² por caja de EJEMPLO; Juan los ajusta en Ajustes → Catálogo.
   const base = [
-    ["Piso laminado 8 mm", "m2", 320, 210],
-    ["Piso laminado 12 mm", "m2", 420, 290],
-    ["Piso SPC 5 mm (click)", "m2", 480, 330],
-    ["Piso vinílico PVC autoadherible", "m2", 260, 160],
+    ["Piso laminado 8 mm", "m2", 320, 210, 2.13],
+    ["Piso laminado 12 mm", "m2", 420, 290, 1.48],
+    ["Piso SPC 5 mm (click)", "m2", 480, 330, 2.23],
+    ["Piso vinílico PVC autoadherible", "m2", 260, 160, 5.02],
     ["Bajo piso / espuma", "m2", 35, 18],
     ["Instalación de piso", "m2", 120, 0],
     ["Zoclo PVC", "ml", 95, 45],
@@ -305,5 +306,5 @@ function seedIfEmpty() {
   ];
   save("ajustes", { ...ajustes(), catalogoSembrado: true });
   // semilla:true = catálogo de fábrica; se reemplaza si se restaura un respaldo.
-  base.forEach(([nombre, unidad, precio, costo]) => save("servicios", { nombre, unidad, precio, costo, semilla: true }));
+  base.forEach(([nombre, unidad, precio, costo, m2Caja]) => save("servicios", { nombre, unidad, precio, costo, m2Caja: m2Caja || "", semilla: true }));
 }

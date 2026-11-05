@@ -39,7 +39,7 @@ export function renderAjustes(container) {
       <div class="card-h-row"><h3 class="card-h">Catálogo de servicios</h3><button class="btn btn-ghost btn-sm" id="nuevo-serv">+ Agregar</button></div>
       <p class="muted small">Al escribir un producto en un trabajo o cotización, se llenan solos la unidad y el precio.</p>
       <div class="catalogo">
-        ${cat.map((s) => `<div class="row-card slim" data-id="${esc(s.id)}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong></div>`).join("") || `<p class="muted">Sin servicios.</p>`}
+        ${cat.map((s) => `<div class="row-card slim" data-id="${esc(s.id)}"><span class="grow">${esc(s.nombre)}</span><span class="muted small">costo ${money(s.costo)}</span><strong>${money(s.precio)} / ${UNIDADES[s.unidad] || ""}</strong>${s.m2Caja ? `<span class="muted small">📦 ${esc(s.m2Caja)} m²</span>` : ""}</div>`).join("") || `<p class="muted">Sin servicios.</p>`}
       </div>
     </div>
 
@@ -167,6 +167,7 @@ function formServicio(s = {}) {
         <label class="field"><span>Precio al cliente</span><input class="input" name="precio" type="number" inputmode="decimal" step="0.01" value="${esc(s.precio ?? "")}" /></label>
         <label class="field"><span>Costo unitario</span><input class="input" name="costo" type="number" inputmode="decimal" step="0.01" value="${esc(s.costo ?? "")}" /></label>
       </div>
+      <label class="field"><span>m² por caja (opcional: pisos que se venden por caja)</span><input class="input" name="m2Caja" type="number" inputmode="decimal" step="0.001" min="0" placeholder="Ej. 2.13" value="${esc(s.m2Caja || "")}" /></label>
       <div class="form-actions">
         <button class="btn btn-primary grow" type="submit">Guardar</button>
         ${s.id ? `<button class="btn btn-danger" type="button" data-del>Eliminar</button>` : ""}
@@ -175,7 +176,7 @@ function formServicio(s = {}) {
   $("#f-serv", body).onsubmit = async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target).entries());
-    await store.save("servicios", { ...s, semilla: false, nombre: f.nombre.trim(), unidad: f.unidad, precio: num(f.precio), costo: num(f.costo) });
+    await store.save("servicios", { ...s, semilla: false, nombre: f.nombre.trim(), unidad: f.unidad, precio: num(f.precio), costo: num(f.costo), m2Caja: num(f.m2Caja) > 0 ? num(f.m2Caja) : "" });
     closeModal();
   };
   const del = $("[data-del]", body);
