@@ -1,0 +1,186 @@
+// ============================================================
+// modules/cotizaciones.js
+// Cotizaciones guardadas (en la app de alarmas solo se generaban
+// y se perdían): folio, vigencia, estado Abierta / Aceptada /
+// Rechazada, envío por WhatsApp, PDF y botón "Convertir en orden"
+// que pasa cliente, vehículo y servicios sin volver a capturar.
+// ============================================================
+
+import * as store from "../store.js";
+import { esc, money, num, fecha, hoyISO, toast, openModal, closeModal, confirmar, emptyState, $, $$ } from "../ui.js";
+import { lineasEditorHTML, bindLineas, leerLineas, totales, resumenHTML } from "../lineas.js";
+import { abrirDocumento, vehiculoTxt } from "../documento.js";
+import { asegurarCliente } from "./clientes.js";
+import { formOrden, detalleOrden } from "./ordenes.js";
+
+const EST = { ABIERTA: "Abierta", ACEPTADA: "Aceptada", RECHAZADA: "Rechazada" };
+let filtro = "ABIERTA";
+
+function vencida(c) {
+  if (c.estado !== "ABIERTA" || !c.fecha) return false;
+  const vence = new Date(c.fecha + "T00:00:00");
+  vence.setDate(vence.getDate() + Number(c.vigenciaDias || 15));
+  return vence < new Date();
+}
+
+export function renderCotizaciones(container, user, param) {
+  container.innerHTML = `
+    <div class="view-head">
+      <h2>Cotizaciones</h2>
+      <button class="btn btn-primary" id="nueva-cot">+ Nueva cotización</button>
+    </div>
+    <div class="filters" id="filtros-cot">
+      ${[["ABIERTA", "Abiertas"], ["ACEPTADA", "Aceptadas"], ["RECHAZADA", "Rechazadas"], ["TODAS", "Todas"]]
+        .map(([k, l]) => `<button class="chip ${k === filtro ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}
+    </div>
+    <div id="lista-cot"></div>`;
+
+  $("#nueva-cot", container).onclick = () => formCotizacion();
+  $("#filtros-cot", container).onclick = (e) => {
+    const b = e.target.closest("[data-f]");
+    if (!b) return;
+    filtro = b.dataset.f;
+    $$(".chip", container).forEach((c) => c.classList.toggle("active", c === b));
+    pintar(container);
+  };
+  pintar(container);
+
+  if (param) {
+    history.replaceState(null, "", "#/cotizaciones");
+    if (param === "nueva") formCotizacion();
+    else detalleCot(param);
+  }
+}
+
+function pintar(container) {
+  const lista = store.all("cotizaciones").filter((c) => filtro === "TODAS" || c.estado === filtro)
+    .sort((a, b) => (b.folio || 0) - (a.folio || 0));
+  const el = $("#lista-cot", container);
+  el.innerHTML = lista.length ? `<div class="grid-cards">${lista.map((c) => `
+    <div class="card orden-card" data-id="${c.id}">
+      <div class="orden-top"><span class="folio">COT #${String(c.folio).padStart(4, "0")}</span>
+        <span class="estado c-${c.estado}">${vencida(c) ? "Vencida" : EST[c.estado]}</span></div>
+      <div class="card-title">${esc(vehiculoTxt(c.vehiculo) || "Vehículo")}</div>
+      <div class="muted small">${esc(c.clienteNombre || "")} · ${fecha(c.fecha)}</div>
+      <div class="orden-bottom"><strong>${money(totales(c).total)}</strong></div>
+    </div>`).join("")}</div>` : emptyState("📄", "No hay cotizaciones en este filtro.");
+  el.querySelectorAll("[data-id]").forEach((n) => (n.onclick = () => detalleCot(n.dataset.id)));
+}
+
+function detalleCot(id) {
+  const c = store.get("cotizaciones", id);
+  if (!c) return;
+  const t = totales(c);
+  const body = openModal(`Cotización #${String(c.folio).padStart(4, "0")}`, `
+    <div class="card-title">${esc(vehiculoTxt(c.vehiculo))}</div>
+    <div class="muted small">${esc(c.clienteNombre)}${c.telefono ? " · " + esc(c.telefono) : ""} · ${fecha(c.fecha)} · Vigencia ${esc(c.vigenciaDias)} días ${vencida(c) ? '<span class="pill bad">Vencida</span>' : ""}</div>
+    <h4 class="section-label">Conceptos</h4>
+    <div class="tabla-lineas">
+      ${(c.servicios || []).map((l) => `<div><span>${esc(l.descripcion)}${l.cantidad > 1 ? ` <em>x${l.cantidad}</em>` : ""}</span><span>${money(l.cantidad * l.precio)}</span></div>`).join("")}
+    </div>
+    ${resumenHTML(t)}
+    ${c.notas ? `<p class="muted">${esc(c.notas)}</p>` : ""}
+    <div class="form-actions wrap">
+      ${c.ordenId ? `<button class="btn btn-primary" data-act="ver-orden">Ver orden</button>`
+        : `<button class="btn btn-primary" data-act="convertir">✅ Convertir en orden</button>`}
+      <button class="btn btn-ghost" data-act="doc">🖨️ PDF / WhatsApp</button>
+      <button class="btn btn-ghost" data-act="edit">✏️ Editar</button>
+      ${c.estado === "ABIERTA" ? `<button class="btn btn-ghost" data-act="rechazar">Rechazada</button>` : ""}
+      <button class="btn btn-danger" data-act="del">🗑️</button>
+    </div>`, { wide: true });
+
+  const act = (k) => $(`[data-act=${k}]`, body);
+  act("doc").onclick = () => abrirDocumento("cotizacion", c);
+  act("edit").onclick = () => formCotizacion(c);
+  if (act("ver-orden")) act("ver-orden").onclick = () => detalleOrden(c.ordenId);
+  if (act("convertir")) act("convertir").onclick = () => formOrden({
+    clienteNombre: c.clienteNombre, telefono: c.telefono, vehiculo: c.vehiculo,
+    servicios: c.servicios, descuento: c.descuento, conIva: c.conIva, notas: c.notas, cotizacionId: c.id
+  });
+  if (act("rechazar")) act("rechazar").onclick = async () => {
+    await store.save("cotizaciones", { ...c, estado: "RECHAZADA" });
+    toast("Marcada como rechazada");
+    detalleCot(id);
+  };
+  act("del").onclick = async () => {
+    if (!(await confirmar("¿Eliminar esta cotización?"))) return;
+    await store.remove("cotizaciones", c.id);
+    closeModal();
+  };
+}
+
+function formCotizacion(c = {}) {
+  const a = store.ajustes();
+  const v = c.vehiculo || {};
+  const clientes = store.all("clientes");
+  const editando = !!c.id;
+
+  const body = openModal(editando ? "Editar cotización" : "Nueva cotización", `
+    <form id="f-cot" class="form">
+      <datalist id="dl-clientes-c">${clientes.map((x) => `<option value="${esc(x.nombre)}">`).join("")}</datalist>
+      <div class="cols-2">
+        <label class="field"><span>Cliente *</span><input class="input" name="clienteNombre" list="dl-clientes-c" required value="${esc(c.clienteNombre || "")}" /></label>
+        <label class="field"><span>Teléfono (WhatsApp)</span><input class="input" name="telefono" type="tel" inputmode="tel" value="${esc(c.telefono || "")}" /></label>
+      </div>
+      <div class="cols-3">
+        <label class="field"><span>Marca</span><input class="input" name="marca" value="${esc(v.marca || "")}" /></label>
+        <label class="field"><span>Modelo</span><input class="input" name="modelo" value="${esc(v.modelo || "")}" /></label>
+        <label class="field"><span>Año</span><input class="input" name="anio" inputmode="numeric" value="${esc(v.anio || "")}" /></label>
+      </div>
+      <div class="cols-2">
+        <label class="field"><span>Color</span><input class="input" name="color" value="${esc(v.color || "")}" /></label>
+        <label class="field"><span>Placas</span><input class="input" name="placas" value="${esc(v.placas || "")}" /></label>
+      </div>
+      <div class="form-section">Conceptos</div>
+      ${lineasEditorHTML(c.servicios)}
+      <div class="cols-3">
+        <label class="field"><span>Descuento $</span><input class="input" name="descuento" type="number" inputmode="decimal" step="0.01" value="${esc(c.descuento || "")}" /></label>
+        <label class="field check"><input type="checkbox" name="conIva" ${c.conIva ? "checked" : ""} /><span>Agregar IVA ${a.ivaPct}%</span></label>
+        <label class="field"><span>Vigencia (días)</span><input class="input" name="vigenciaDias" type="number" value="${esc(c.vigenciaDias || a.vigenciaDias)}" /></label>
+      </div>
+      <div id="resumen-cot"></div>
+      <label class="field"><span>Notas para el cliente</span><textarea class="input" name="notas" rows="2">${esc(c.notas || "")}</textarea></label>
+      <div class="form-actions">
+        <button class="btn btn-primary grow" type="submit">💾 Guardar cotización</button>
+        <button class="btn btn-ghost" type="button" data-cancel>Cancelar</button>
+      </div>
+    </form>`, { wide: true });
+
+  const form = $("#f-cot", body);
+  const actualizar = () => {
+    $("#resumen-cot", form).innerHTML = resumenHTML(totales({
+      servicios: leerLineas(form), descuento: form.elements.descuento.value, conIva: form.elements.conIva.checked, ivaPct: a.ivaPct
+    }));
+  };
+  bindLineas(form, actualizar);
+  form.elements.descuento.oninput = actualizar;
+  form.elements.conIva.onchange = actualizar;
+  actualizar();
+  $("[data-cancel]", form).onclick = closeModal;
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(form).entries());
+    const servicios = leerLineas(form);
+    if (!servicios.length) { toast("Agrega al menos un concepto"); return; }
+    const cli = await asegurarCliente(f.clienteNombre, f.telefono);
+    const saved = await store.save("cotizaciones", {
+      ...c,
+      folio: editando ? c.folio : store.siguienteFolio("cotizaciones"),
+      fecha: c.fecha || hoyISO(),
+      estado: c.estado || "ABIERTA",
+      clienteId: cli?.id || "",
+      clienteNombre: f.clienteNombre.trim(),
+      telefono: f.telefono.trim(),
+      vehiculo: { marca: f.marca.trim(), modelo: f.modelo.trim(), anio: f.anio.trim(), color: f.color.trim(), placas: f.placas.trim().toUpperCase() },
+      servicios,
+      descuento: num(f.descuento),
+      conIva: !!f.conIva,
+      ivaPct: a.ivaPct,
+      vigenciaDias: num(f.vigenciaDias) || a.vigenciaDias,
+      notas: f.notas.trim()
+    });
+    toast("Cotización guardada");
+    detalleCot(saved.id);
+  };
+}

@@ -1,17 +1,17 @@
 // ============================================================
 // firebase-config.js
-// Reemplazar DEFAULT_FB_CONFIG con las credenciales del proyecto
-// Firebase de este cliente específico. Se deja embebido directo
-// en el código (no solo en localStorage) porque en HD Crédit se
-// detectó que localStorage se puede perder con actualizaciones
-// del sistema operativo del teléfono.
+// Credenciales de Firebase de ESTE cliente, embebidas en el código
+// (no solo en localStorage: en HD Crédit se vio que localStorage se
+// puede perder con actualizaciones del sistema del teléfono).
+//
+// MODO DEMO: mientras apiKey siga como "TU_API_KEY", la app corre en
+// modo demo: login local y datos guardados en el propio dispositivo.
+// Así se le puede mandar al cliente para que la pruebe sin crear aún
+// el proyecto de Firebase. Al pegar aquí el firebaseConfig real, la
+// app cambia sola a Firebase Auth + Firestore (sin tocar nada más).
 // ============================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const DEFAULT_FB_CONFIG = {
+export const FIREBASE_CONFIG = {
   apiKey: "TU_API_KEY",
   authDomain: "TU_PROYECTO.firebaseapp.com",
   projectId: "TU_PROYECTO",
@@ -20,13 +20,30 @@ const DEFAULT_FB_CONFIG = {
   appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
 };
 
-const app = initializeApp(DEFAULT_FB_CONFIG);
+export const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2";
 
-// Persistencia de almacenamiento local (evita que iOS/Android
-// limpien datos en bajo almacenamiento).
+export const DEMO_MODE = FIREBASE_CONFIG.apiKey === "TU_API_KEY";
+
+// Pide al navegador no borrar los datos en bajo almacenamiento
+// (importante en modo demo, donde todo vive en el teléfono).
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
 }
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Firebase se carga bajo demanda: en modo demo nunca se descarga.
+let _fb = null;
+export async function getFirebase() {
+  if (DEMO_MODE) return null;
+  if (_fb) return _fb;
+  const [{ initializeApp }, authMod, fsMod] = await Promise.all([
+    import(`${FIREBASE_SDK}/firebase-app.js`),
+    import(`${FIREBASE_SDK}/firebase-auth.js`),
+    import(`${FIREBASE_SDK}/firebase-firestore.js`)
+  ]);
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = fsMod.initializeFirestore(app, {
+    localCache: fsMod.persistentLocalCache({ tabManager: fsMod.persistentMultipleTabManager() })
+  });
+  _fb = { app, auth: authMod.getAuth(app), db, authMod, fsMod };
+  return _fb;
+}

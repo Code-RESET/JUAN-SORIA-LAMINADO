@@ -1,52 +1,85 @@
 // ============================================================
 // router.js
-// Router simple por hash (#/ruta). No recarga la página.
-// Cada módulo nuevo del proyecto se registra en MODULES abajo:
-// eso es lo único que hay que tocar para agregar una sección.
+// Router por hash (#/ruta/parametro), sin recargar la página.
+// Para agregar una sección: crear js/modules/xxx.js con su
+// render(container, user, param) y registrarla en MODULES.
+// El menú lateral se arma solo a partir de este arreglo.
 // ============================================================
 
 import { renderDashboard } from "./modules/dashboard.js";
+import { renderOrdenes } from "./modules/ordenes.js";
+import { renderCotizaciones } from "./modules/cotizaciones.js";
+import { renderClientes } from "./modules/clientes.js";
+import { renderGastos } from "./modules/gastos.js";
+import { renderAjustes } from "./modules/ajustes.js";
+import { onChange } from "./store.js";
+import { esc } from "./ui.js";
 
-// Registro de módulos: agregar aquí cada módulo nuevo del proyecto.
-// path   -> texto después del # en la URL
-// label  -> texto que aparece en el menú de navegación
-// render -> función que recibe (container, user) y pinta la vista
+// group -> título de sección en el menú
 const MODULES = [
-  { path: "dashboard", label: "Inicio", render: renderDashboard },
-  // { path: "clientes", label: "Clientes", render: renderClientes },
-  // { path: "reportes", label: "Reportes", render: renderReportes },
+  { path: "dashboard", label: "Inicio", icon: "📊", group: "PRINCIPAL", render: renderDashboard },
+  { path: "ordenes", label: "Órdenes", icon: "🚗", group: "TALLER", render: renderOrdenes },
+  { path: "cotizaciones", label: "Cotizaciones", icon: "📄", group: "TALLER", render: renderCotizaciones },
+  { path: "clientes", label: "Clientes", icon: "👤", group: "TALLER", render: renderClientes },
+  { path: "gastos", label: "Gastos", icon: "🧰", group: "DINERO", render: renderGastos },
+  { path: "ajustes", label: "Ajustes", icon: "⚙️", group: "CONFIG", render: renderAjustes }
 ];
 
 const nav = document.getElementById("app-nav");
+const tabbar = document.getElementById("tabbar");
 const content = document.getElementById("app-content");
 
 let currentUser = null;
+let started = false;
 
 function buildNav() {
-  nav.innerHTML = MODULES.map(
-    (m) => `<a href="#/${m.path}" data-path="${m.path}">${m.label}</a>`
-  ).join("");
+  let lastGroup = "";
+  nav.innerHTML = MODULES.map((m) => {
+    const head = m.group !== lastGroup ? `<div class="nav-group">${esc(m.group)}</div>` : "";
+    lastGroup = m.group;
+    return `${head}<a href="#/${m.path}" data-path="${m.path}"><span class="nav-icon">${m.icon}</span>${esc(m.label)}</a>`;
+  }).join("");
+
+  // Barra inferior en teléfono: las 4 secciones de uso diario + "+".
+  const tab = (p) => MODULES.find((m) => m.path === p);
+  tabbar.innerHTML = ["dashboard", "ordenes"].map((p) => `<a href="#/${p}" data-path="${p}"><span>${tab(p).icon}</span>${tab(p).label}</a>`).join("")
+    + `<a href="#/ordenes/nueva" class="tab-plus" aria-label="Nueva orden"><span>＋</span></a>`
+    + ["cotizaciones", "clientes"].map((p) => `<a href="#/${p}" data-path="${p}"><span>${tab(p).icon}</span>${p === "cotizaciones" ? "Cotizar" : tab(p).label}</a>`).join("");
 }
 
-function setActiveLink(path) {
-  nav.querySelectorAll("a").forEach((a) => {
-    a.classList.toggle("active", a.dataset.path === path);
-  });
+function parseHash() {
+  const [path, ...rest] = location.hash.replace(/^#\/?/, "").split("/");
+  return { path: path || MODULES[0].path, param: rest.join("/") || null };
 }
 
 function renderRoute() {
-  const path = (location.hash.replace("#/", "") || MODULES[0]?.path);
+  const { path, param } = parseHash();
   const mod = MODULES.find((m) => m.path === path) || MODULES[0];
-  if (!mod) return;
 
-  setActiveLink(mod.path);
+  document.querySelectorAll("[data-path]").forEach((a) => a.classList.toggle("active", a.dataset.path === mod.path));
+  document.body.classList.remove("nav-open");
+  const keepScroll = !param && content.dataset.view === mod.path ? window.scrollY : 0;
+  content.dataset.view = mod.path;
   content.innerHTML = "";
-  mod.render(content, currentUser);
+  try {
+    mod.render(content, currentUser, param);
+  } catch (e) {
+    console.error(e);
+    content.innerHTML = `<p class="error-text">Error al mostrar la sección: ${esc(e.message)}</p>`;
+  }
+  window.scrollTo(0, keepScroll);
 }
 
 export function initRouter(user) {
   currentUser = user;
   buildNav();
-  window.addEventListener("hashchange", renderRoute);
+  if (!started) {
+    started = true;
+    window.addEventListener("hashchange", renderRoute);
+    // Cuando cambian los datos (otro dispositivo o un guardado) se
+    // repinta la vista actual; los modales abiertos no se tocan.
+    let t;
+    onChange(() => { clearTimeout(t); t = setTimeout(renderRoute, 60); });
+  }
   renderRoute();
 }

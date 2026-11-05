@@ -1,25 +1,40 @@
-# Code-Reset Boilerplate
+# Juan Soria · Laminado y Pintura — Control de taller (DEMO)
 
-Esqueleto base para arrancar cualquier proyecto nuevo de Code-Reset: PWA en HTML/JS puro (ES6 modules), sin build, con Firebase Auth + Firestore, login con firma de desarrollador, router por hash y estructura modular.
+PWA en HTML/JS puro (ES6 modules, sin build), basada en la estructura de *Alarmas ReSeT Pro* con mejoras.
+Desarrollado por: Ing. Luis Ángel Díaz Bernal · Compañía: CODE-RESET
 
-## Cómo usar este repo
+## Secciones
+| Sección | Qué hace |
+|---|---|
+| **Inicio** | Cobrado del mes, por cobrar, trabajos del mes, gastos, utilidad neta; autos por estado; listos para entregar; próximas entregas (marca atrasados). |
+| **Órdenes** | Folio consecutivo, cliente, vehículo (marca/modelo/año/color/placas), daños al recibir, particular o aseguradora (+ no. de siniestro), servicios del catálogo, descuento, IVA opcional, anticipo, fecha de entrega. Estado del trabajo (Recibido → En proceso → Listo → Entregado) separado del pago, abonos parciales con historial, impresión/PDF y aviso "listo" por WhatsApp. |
+| **Cotizaciones** | Se guardan con folio, vigencia y estado (Abierta/Aceptada/Rechazada/Vencida). PDF + WhatsApp. **Convertir en orden** con un toque. |
+| **Clientes** | Se crean solos al hacer una orden/cotización. Historial de trabajos, total histórico y saldo, WhatsApp y llamada. |
+| **Gastos** | Por mes y categoría (pintura y materiales, herramienta, renta, sueldos...). |
+| **Ajustes** | Datos del negocio (salen en los documentos), catálogo de servicios con precio y costo, respaldo/restauración JSON, exportar órdenes a Excel (CSV), instalar app, datos de ejemplo. |
 
-1. Sube esta carpeta a GitHub como repo nuevo (ej. `code-reset-boilerplate`).
-2. En **Settings → Template repository**, activa la casilla. Esto habilita el botón "Use this template".
-3. Para cada proyecto nuevo: "Use this template" → nombra el repo del cliente → clona.
-4. Edita `js/firebase-config.js` con el `firebaseConfig` real del proyecto (Firebase Console → Configuración del proyecto → Tus apps → SDK config).
-5. Cambia `<p id="app-name-slot">` en `index.html` por el nombre real de la app.
-6. Reemplaza `assets/logo.svg`, `icon-192.png` e `icon-512.png` si el cliente pide su propia marca (por default se usa la identidad Code-Reset).
-7. Activa GitHub Pages (Settings → Pages → rama `main`, carpeta `/root`).
-8. Sube el cambio de `CACHE_VERSION` en `service-worker.js` cada vez que actualices archivos base, para que los teléfonos ya instalados jalen la versión nueva.
+## Modo demo vs. Firebase
+- Mientras `js/firebase-config.js` tenga `apiKey: "TU_API_KEY"`, la app corre en **modo demo**: login local
+  (`demo@juansoria.mx` / `demo2026`) y datos guardados en el propio teléfono (localStorage). No requiere crear nada.
+- Para producción: pegar el `firebaseConfig` real, crear el usuario en Firebase Auth y publicar `firestore.rules`.
+  La app cambia sola a Firebase Auth + Firestore (con cache offline), sin tocar los módulos — todos usan `js/store.js`.
 
-## Cómo agregar un módulo nuevo
+## Estructura
+```
+js/firebase-config.js   credenciales + detección de modo demo
+js/store.js             capa de datos única (localStorage o Firestore)
+js/auth.js              login/logout
+js/router.js            rutas por hash + menú (arreglo MODULES)
+js/ui.js                utilidades (escape XSS, dinero, modal, toast, WhatsApp)
+js/lineas.js            editor de servicios + cálculo de totales (órdenes y cotizaciones)
+js/documento.js         orden/cotización imprimible
+js/modules/*.js         una sección por archivo
+```
 
-1. Copia `js/modules/dashboard.js` y renómbralo (ej. `clientes.js`).
-2. Escribe su lógica y su propio `render(container, user)`.
-3. Regístralo en `js/router.js` dentro del arreglo `MODULES`.
-4. Listo — aparece solo en el menú y en el routing, sin tocar nada más.
+## Publicar
+GitHub Pages: Settings → Pages → rama `main`, carpeta `/root`. Subir `CACHE_VERSION` en `service-worker.js` al cambiar archivos.
 
-## Reglas de Firestore (pendiente por proyecto)
-
-Este boilerplate no trae `firestore.rules` porque los permisos dependen de los roles de cada cliente. Escribirlas antes de entregar — recordar el bug real detectado en NEXORA: la función `puede()` de permisos existía pero nunca se llamaba, y todos los usuarios terminaban con acceso de admin.
+## Pendiente antes de entregar la versión final
+- Logo y colores del cliente (`assets/`, `--accent` en `css/styles.css`).
+- Proyecto Firebase + `firestore.rules` publicadas y probadas.
+- Probar instalación PWA en Android e iOS, y en Safari iOS / Samsung Internet.

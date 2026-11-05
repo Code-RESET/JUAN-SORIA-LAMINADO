@@ -2,41 +2,44 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<title>Code-Reset App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Juan Soria · Taller</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#000000" />
 <link rel="apple-touch-icon" href="assets/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Code-Reset" />
+<meta name="apple-mobile-web-app-title" content="Juan Soria" />
 
 <link rel="icon" href="assets/icon-192.png" />
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
 
-<!-- ===================== PANTALLA DE LOGIN ===================== -->
-<section id="login-screen" class="screen">
+<!-- ===================== LOGIN ===================== -->
+<section id="login-screen" class="screen" hidden>
   <div class="login-card">
     <img src="assets/logo.svg" alt="Code-Reset" class="login-logo" />
-    <h1 class="login-title">CODE-RESET</h1>
-    <p class="login-subtitle" id="app-name-slot">Nombre de la app</p>
+    <h1 class="login-title">JUAN SORIA</h1>
+    <p class="login-subtitle">Laminado y Pintura · Control de taller</p>
 
-    <form id="login-form" autocomplete="off">
+    <form id="login-form" autocomplete="on">
       <label class="field">
         <span>Correo</span>
-        <input type="email" id="login-email" required autocomplete="username" />
+        <input class="input" type="email" id="login-email" required autocomplete="username" />
       </label>
       <label class="field">
         <span>Contraseña</span>
-        <input type="password" id="login-password" required autocomplete="current-password" />
+        <input class="input" type="password" id="login-password" required autocomplete="current-password" />
       </label>
       <p id="login-error" class="error-text" hidden></p>
-      <button type="submit" id="login-btn" class="btn-primary">Entrar</button>
+      <button type="submit" id="login-btn" class="btn btn-primary btn-block">Entrar</button>
+      <p id="demo-hint" class="notice small" hidden>Versión demo: los datos se guardan en este dispositivo.</p>
     </form>
 
     <footer class="login-footer">
@@ -46,26 +49,82 @@
   </div>
 </section>
 
-<!-- ===================== SHELL DE LA APP ===================== -->
+<!-- ===================== APP ===================== -->
 <section id="app-shell" class="screen" hidden>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-name">JUAN SORIA</div>
+      <div class="brand-sub">Laminado y Pintura</div>
+    </div>
+    <nav id="app-nav" class="app-nav"></nav>
+    <div class="sidebar-foot">
+      <div class="muted small" id="user-email"></div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm">Cerrar sesión</button>
+      <div class="dev-sign">CODE-RESET · Ing. Luis Ángel Díaz Bernal</div>
+    </div>
+  </aside>
+  <div id="nav-backdrop" class="nav-backdrop"></div>
+
   <header class="app-header">
-    <img src="assets/logo.svg" alt="Code-Reset" class="header-logo" />
-    <nav id="app-nav" class="app-nav"><!-- router.js pinta los links según los módulos registrados --></nav>
-    <button id="logout-btn" class="btn-ghost">Salir</button>
+    <button id="menu-btn" class="icon-btn menu-btn" aria-label="Menú">☰</button>
+    <div class="brand-name">JUAN SORIA</div>
+    <span id="net-badge" class="net-badge" hidden>Sin conexión</span>
   </header>
 
-  <main id="app-content" class="app-content">
-    <!-- router.js inyecta aquí la vista activa -->
-  </main>
+  <main id="app-content" class="app-content"></main>
+  <nav id="tabbar" class="tabbar"></nav>
+  <div id="loading" class="loading" hidden><div class="spinner"></div></div>
 </section>
 
-<script type="module" src="js/router.js"></script>
-<script type="module" src="js/auth.js"></script>
+<!-- Modal genérico -->
+<div id="modal" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <div class="modal-title"></div>
+      <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body"></div>
+  </div>
+</div>
 
+<!-- Confirmación -->
+<div id="confirm" class="modal-overlay confirm" hidden>
+  <div class="modal small">
+    <p class="confirm-msg"></p>
+    <div class="form-actions">
+      <button class="btn btn-ghost grow" data-no>Cancelar</button>
+      <button class="btn btn-danger grow" data-ok>Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Documento imprimible (orden / cotización) -->
+<div id="doc-overlay" class="doc-overlay" hidden>
+  <div class="doc-topbar">
+    <span class="doc-topbar-title">Documento</span>
+    <button class="btn btn-primary btn-sm" data-doc-print>🖨️ Imprimir / PDF</button>
+    <a class="btn btn-wa btn-sm" data-doc-wa target="_blank" rel="noopener">WhatsApp</a>
+    <button class="icon-btn" data-doc-close aria-label="Cerrar">✕</button>
+  </div>
+  <div class="doc-frame"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script type="module" src="js/auth.js"></script>
 <script>
+  // Aviso de conexión
+  function netState() { document.getElementById('net-badge').hidden = navigator.onLine; }
+  window.addEventListener('online', netState);
+  window.addEventListener('offline', netState);
+  netState();
+
+  // Botón "Instalar app" (Android/Chrome) en Ajustes
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__installPrompt = e; });
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(err => {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function (err) {
         console.warn('Service worker no registrado:', err);
       });
     });
