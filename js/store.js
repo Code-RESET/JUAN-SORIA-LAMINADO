@@ -29,6 +29,7 @@ const fallidas = new Set();
 // Colecciones clave que llegaron vacías SOLO desde la cache (sin
 // confirmar con el servidor). Se quitan al confirmar.
 const sinConfirmar = new Set();
+const confirmadas = new Set(); // ya vistas desde el servidor al menos una vez
 
 export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -66,6 +67,7 @@ export async function initStore(user) {
   uid = user.uid;
   fallidas.clear();
   sinConfirmar.clear();
+  confirmadas.clear();
 
   if (DEMO_MODE) {
     COLLECTIONS.forEach((c) => (cache[c] = lsRead(c)));
@@ -93,8 +95,9 @@ export async function initStore(user) {
         const clave = col === "servicios" || col === "ajustes";
         // Dispositivo nuevo sin señal: la cache local llega vacía. No es
         // "no hay datos", es "aún no sabemos": no sembrar ni numerar.
-        if (clave && snap.metadata.fromCache && snap.empty) sinConfirmar.add(col);
-        if (!snap.metadata.fromCache) sinConfirmar.delete(col);
+        // Perder la señal después NO vuelve a marcarla: ya se confirmó.
+        if (!snap.metadata.fromCache) { confirmadas.add(col); sinConfirmar.delete(col); }
+        else if (clave && snap.empty && !confirmadas.has(col)) sinConfirmar.add(col);
         const soloMetadatos = !first && snap.docChanges().length === 0;
         cache[col] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
         if (first) { first = false; resolve(); return; }
