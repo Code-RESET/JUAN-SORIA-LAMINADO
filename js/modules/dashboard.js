@@ -15,17 +15,19 @@ export function renderDashboard(container) {
   const mes = mesClave(hoy);
   const ordenes = store.all("ordenes");
 
-  let cobradoMes = 0, vendidoMes = 0, costoMes = 0, porCobrar = 0;
+  let cobradoMes = 0, vendidoMes = 0, utilidadTrabajos = 0, porCobrar = 0;
   ordenes.forEach((o) => {
     const t = totales(o);
     porCobrar += t.saldo;
-    if (mesClave(o.fechaIngreso) === mes) { vendidoMes += t.total; costoMes += t.costo; }
+    if (mesClave(o.fechaIngreso) === mes) { vendidoMes += t.total; utilidadTrabajos += t.utilidad; }
     (o.pagos || []).forEach((p) => { if (mesClave(p.fecha) === mes) cobradoMes += num(p.monto); });
   });
   const gastosMes = store.all("gastos").filter((g) => mesClave(g.fecha) === mes).reduce((s, g) => s + num(g.monto), 0);
   // Utilidad del mes sobre lo VENDIDO (no lo cobrado): los anticipos
   // pagan material y harían ver pérdidas falsas a mitad de mes.
-  const utilidad = vendidoMes - costoMes - gastosMes;
+  // Se usa la utilidad de cada trabajo SIN IVA (el IVA no es ganancia,
+  // se le debe a Hacienda): (precio − descuento) − costo de material.
+  const utilidad = utilidadTrabajos - gastosMes;
   const cotAbiertas = store.all("cotizaciones").filter((c) => c.estado === "ABIERTA").length;
 
   const conteo = Object.keys(ESTADOS).map((k) => [k, ordenes.filter((o) => o.estado === k).length]);
@@ -56,7 +58,7 @@ export function renderDashboard(container) {
       <a class="stat" href="#/ordenes/f:TODAS"><span>Vendido este mes</span><strong>${money(vendidoMes)}</strong></a>
       <a class="stat bad" href="#/gastos"><span>Gastos del mes</span><strong>${money(gastosMes)}</strong></a>
       <div class="stat ${utilidad >= 0 ? "ok" : "bad"} wide"><span>Utilidad estimada del mes</span><strong>${money(utilidad)}</strong>
-        <small>Vendido − costo de material − gastos</small></div>
+        <small>Vendido sin IVA − costo de material − gastos</small></div>
     </div>
 
     <h3 class="section-label">Trabajos</h3>
